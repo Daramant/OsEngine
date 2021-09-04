@@ -74,30 +74,9 @@ namespace OsEngine.Robots
             result.Add("RviTrade");
             result.AddRange(BotsWithAttribute.Keys);
 
-            List<string> resultTrue = new List<string>();
+            result.Sort();
 
-            for (int i = 0; i < result.Count; i++)
-            {
-                bool isInArray = false;
-
-                for (int i2 = 0; i2 < resultTrue.Count; i2++)
-                {
-                    if (resultTrue[i2][0] > result[i][0])
-                    {
-                        resultTrue.Insert(i2, result[i]);
-                        isInArray = true;
-                        break;
-                    }
-                }
-
-                if (isInArray == false)
-                {
-                    resultTrue.Add(result[i]);
-                }
-            }
-
-
-            return resultTrue;
+            return result;
         }
 
         /// <summary>
@@ -301,39 +280,16 @@ namespace OsEngine.Robots
                 Directory.CreateDirectory(@"Custom\Robots");
             }
 
-            List<string> resultOne = GetFullNamesFromFolder(@"Custom\Robots");
+            List<string> names = GetFullNamesFromFolder(@"Custom\Robots");
 
-            for (int i = 0; i < resultOne.Count; i++)
+            for (int i = 0; i < names.Count; i++)
             {
-                resultOne[i] = resultOne[i].Split('\\')[resultOne[i].Split('\\').Length - 1];
-                resultOne[i] = resultOne[i].Split('.')[0];
+                names[i] = Path.GetFileNameWithoutExtension(names[i]);
             }
 
-            // resultOne.Add("Ssma");
-
-            List<string> resultTrue = new List<string>();
-
-            for (int i = 0; i < resultOne.Count; i++)
-            {
-                bool isInArray = false;
-
-                for (int i2 = 0; i2 < resultTrue.Count; i2++)
-                {
-                    if (resultTrue[i2][0] > resultOne[i][0])
-                    {
-                        resultTrue.Insert(i2, resultOne[i]);
-                        isInArray = true;
-                        break;
-                    }
-                }
-
-                if (isInArray == false)
-                {
-                    resultTrue.Add(resultOne[i]);
-                }
-            }
-
-            return resultTrue;
+            names.Sort();
+            
+            return names;
         }
 
         private static List<string> GetFullNamesFromFolder(string directory)
@@ -347,18 +303,9 @@ namespace OsEngine.Robots
                 results.AddRange(GetFullNamesFromFolder(subDirectories[i]));
             }
 
-            string[] files = Directory.GetFiles(directory);
+            string[] files = Directory.GetFiles(directory, "*.cs");
 
-            results.AddRange(files.ToList());
-
-            for (int i = 0; i < results.Count; i++)
-            {
-                if (results[i].EndsWith("cs") == false)
-                {
-                    results.RemoveAt(i);
-                    i--;
-                }
-            }
+            results.AddRange(files);
 
             for (int i = 0; i < results.Count; i++)
             {
