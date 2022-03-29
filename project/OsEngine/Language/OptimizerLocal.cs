@@ -170,10 +170,14 @@ namespace OsEngine.Language
         public string Message40 => OsLocalization.ConvertToLocString(
             "Eng:Chart_" +
             "Ru:График_");
+
         public string Message41 => OsLocalization.ConvertToLocString(
             "Eng:Cannot start optimization. Parameter 'regime' is Off._" +
             "Ru:Не возможно запустить оптимизацию. Параметр 'regime' Off._");
 
+        public string Message42 => OsLocalization.ConvertToLocString(
+            "Eng:Params_" +
+            "Ru:Парам_");
 
         public string Label1 => OsLocalization.ConvertToLocString(
             "Eng:Index securities_" +
@@ -358,5 +362,9 @@ namespace OsEngine.Language
         public string Label46 => OsLocalization.ConvertToLocString(
           "Eng:Load_" +
           "Ru:Загрузить_");
+
+        public string Label47 => OsLocalization.ConvertToLocString(
+          "Eng:Max count of bots -_" +
+          "Ru:Макс. кол-во ботов-_");
     }
 }

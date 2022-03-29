@@ -11,6 +11,7 @@ using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market.Servers.Tester;
+using System.Threading.Tasks;
 
 namespace OsEngine.Market.Servers.Optimizer
 {
@@ -42,14 +43,7 @@ namespace OsEngine.Market.Servers.Optimizer
             CreatePortfolio(portfolioStratValue);
             NumberServer = num;
 
-            if (_worker == null)
-            {
-                _worker = new Thread(WorkThreadArea);
-                _worker.CurrentCulture = new CultureInfo("ru-RU");
-                _worker.Name = "OptimizerThread " + num;
-                _worker.IsBackground = true;
-                _worker.Start();
-            }
+            Task.Run(WorkThreadArea);
 
             _candleManager = new CandleManager(this);
             _candleManager.CandleUpdateEvent += _candleManager_CandleUpdateEvent;
@@ -221,7 +215,12 @@ namespace OsEngine.Market.Servers.Optimizer
             else if (TypeTesterData == TesterDataType.Candle)
             {
 
-                if (_candleSeriesTesterActivate.Find(name => name.TimeFrameSpan < new TimeSpan(0, 0, 1, 0)) == null)
+                if (_candleSeriesTesterActivate.Count != 0 &&
+                    _candleSeriesTesterActivate[0].TimeFrameSpan.TotalMinutes % 5 == 0)
+                {
+                    _timeAddType = TimeAddInTestType.FiveMinute;
+                }
+                else if (_candleSeriesTesterActivate.Find(name => name.TimeFrameSpan < new TimeSpan(0, 0, 1, 0)) == null)
                 {
                     _timeAddType = TimeAddInTestType.Minute;
                 }
@@ -303,18 +302,11 @@ namespace OsEngine.Market.Servers.Optimizer
         private TesterRegime _testerRegime;
 
         /// <summary>
-		/// main thread for loading all data
-        /// основной поток, которые занимается прогрузкой всех данных
-        /// </summary>
-        private Thread _worker;
-
-        /// <summary>
 		/// work place of main thread
         /// место работы основного потока
         /// </summary>
         private void WorkThreadArea()
         {
-            Thread.Sleep(100);
             while (true)
             {
                 try
@@ -346,7 +338,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
                     if (_testerRegime == TesterRegime.Pause)
                     {
-                        Thread.Sleep(20);
+                        Thread.Sleep(1);
                         continue;
                     }
 
@@ -395,7 +387,6 @@ namespace OsEngine.Market.Servers.Optimizer
 
             if (newStorage == null)
             {
-                Thread.Sleep(200);
                 newStorage = _storagePrime.GetStorageToSecurity(security, timeFrame, timeStart, timeEnd);
 
                 if (newStorage == null)
@@ -474,11 +465,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         private void LoadNextData()
         {
-            if (_testerRegime == TesterRegime.Pause)
-            {
-                return;
-            }
-            if (_storages[0].TimeStart > _storages[0].TimeEnd || TimeNow > _storages[0].TimeEnd)
+            if (TimeNow > _storages[0].TimeEnd)
             {
                 _testerRegime = TesterRegime.Pause;
 
@@ -504,7 +491,15 @@ namespace OsEngine.Market.Servers.Optimizer
                 return;
             }
 
-            if (_timeAddType == TimeAddInTestType.MilliSecond)
+            if (_timeAddType == TimeAddInTestType.FiveMinute)
+            {
+                TimeNow = TimeNow.AddMinutes(5);
+            }
+            if (_timeAddType == TimeAddInTestType.Minute)
+            {
+                TimeNow = TimeNow.AddMinutes(1);
+            }
+            else if (_timeAddType == TimeAddInTestType.MilliSecond)
             {
                 TimeNow = TimeNow.AddMilliseconds(1);
             }
@@ -512,14 +507,22 @@ namespace OsEngine.Market.Servers.Optimizer
             {
                 TimeNow = TimeNow.AddSeconds(1);
             }
-            else if (_timeAddType == TimeAddInTestType.Minute)
-            {
-                TimeNow = TimeNow.AddMinutes(1);
-            }
+
+            bool haveLoadingSec = false;
 
             for (int i = 0; _candleSeriesTesterActivate != null && i < _candleSeriesTesterActivate.Count; i++)
             {
+                if(_candleSeriesTesterActivate[i].TimeEnd < TimeNow)
+                {
+                    continue;
+                }
+                haveLoadingSec = true;
                 _candleSeriesTesterActivate[i].Load(TimeNow);
+            }
+
+            if(haveLoadingSec == false)
+            {
+                
             }
         }
 
@@ -551,7 +554,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
                 if (security == null)
                 {
-                    return;
+                    continue;
                 }
 
                 if (security.DataType == SecurityTesterDataType.Tick)
@@ -1183,7 +1186,7 @@ namespace OsEngine.Market.Servers.Optimizer
 		/// take security as Security class by name
         /// взять бумагу в виде класса Security по названию
         /// </summary>
-        public Security GetSecurityForName(string name)
+        public Security GetSecurityForName(string securityName, string securityClass)
         {
             if (_securities == null)
             {
@@ -1192,7 +1195,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
             for(int i = 0;i < _securities.Count;i++)
             {
-                if(_securities[i].Name == name)
+                if(_securities[i].Name == securityName)
                 {
                     return _securities[i];
                 }
@@ -1256,18 +1259,18 @@ namespace OsEngine.Market.Servers.Optimizer
         private object _starterLocker = new object();
 
         /// <summary>
-		/// start downloading data on instrument
+        /// start uploading data on instrument
         /// Начать выгрузку данных по инструменту. 
         /// </summary>
-        /// <param name="namePaper">security name/имя бумаги которую будем запускать</param>
-        /// <param name="timeFrameBuilder">object with timeframe/объект несущий в себе данные о таймФрейме</param>
-        /// <returns>In case of success returns CandleSeries / В случае удачи возвращает CandleSeries
-        /// в случае неудачи null / в случае неудачи null</returns>
-        public CandleSeries StartThisSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder)
+        /// <param name="securityName"> security name for running / имя бумаги которую будем запускать</param>
+        /// <param name="timeFrameBuilder"> object that has data about timeframe / объект несущий в себе данные о таймФрейме</param>
+        /// <param name="securityClass"> security class for running / класс бумаги которую будем запускать</param>
+        /// <returns> returns CandleSeries if successful else null / В случае удачи возвращает CandleSeries в случае неудачи null</returns>
+        public CandleSeries StartThisSecurity(string securityName, TimeFrameBuilder timeFrameBuilder, string securityClass)
         {
             lock (_starterLocker)
             {
-                if (namePaper == "")
+                if (securityName == "")
                 {
                     return null;
                 }
@@ -1286,7 +1289,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
                 for (int i = 0; i < _securities.Count; i++)
                 {
-                    if (_securities[i].Name == namePaper)
+                    if (_securities[i].Name == securityName)
                     {
                         security = _securities[i];
                         break;
@@ -1328,18 +1331,18 @@ namespace OsEngine.Market.Servers.Optimizer
 		/// start uploading data for instrument
         /// Начать выгрузку данных по инструменту
         /// </summary>
-        public CandleSeries GetCandleDataToSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder, DateTime startTime,
-            DateTime endTime, DateTime actualTime, bool neadToUpdate)
+        public CandleSeries GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
+            DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
         {
-            return StartThisSecurity(namePaper, timeFrameBuilder);
+            return StartThisSecurity(securityName, timeFrameBuilder, securityClass);
         }
 
         /// <summary>
 		/// take tick data on the instrument for a certain period
         /// взять тиковые данные по инструменту за определённый период
         /// </summary>
-        public bool GetTickDataToSecurity(string namePaper, DateTime startTime, DateTime endTime, DateTime actualTime,
-            bool neadToUpdete)
+        public bool GetTickDataToSecurity(string securityName, string securityClass, 
+            DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
             return true;
         }
@@ -1463,7 +1466,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
             if (NewBidAscIncomeEvent != null)
             {
-                NewBidAscIncomeEvent(candle.Close, candle.Close,GetSecurityForName(nameSecurity));
+                NewBidAscIncomeEvent(candle.Close, candle.Close,GetSecurityForName(nameSecurity,""));
             }
 
             _candleManager.SetNewCandleInSeries(candle, nameSecurity, timeFrame);
@@ -1624,7 +1627,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
             if (NewBidAscIncomeEvent != null)
             {
-                NewBidAscIncomeEvent(tradesNew[tradesNew.Count - 1].Price, tradesNew[tradesNew.Count - 1].Price, GetSecurityForName(tradesNew[tradesNew.Count - 1].SecurityNameCode));
+                NewBidAscIncomeEvent(tradesNew[tradesNew.Count - 1].Price, tradesNew[tradesNew.Count - 1].Price, GetSecurityForName(tradesNew[tradesNew.Count - 1].SecurityNameCode,""));
             }
         }
 
@@ -1920,7 +1923,7 @@ namespace OsEngine.Market.Servers.Optimizer
             {
                 if (order.Side == Side.Buy)
                 {
-                    Security mySecurity = GetSecurityForName(order.SecurityNameCode);
+                    Security mySecurity = GetSecurityForName(order.SecurityNameCode,"");
 
                     if (mySecurity != null && mySecurity.PriceStep != 0)
                     {
@@ -1930,7 +1933,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
                 if (order.Side == Side.Sell)
                 {
-                    Security mySecurity = GetSecurityForName(order.SecurityNameCode);
+                    Security mySecurity = GetSecurityForName(order.SecurityNameCode,"");
 
                     if (mySecurity != null && mySecurity.PriceStep != 0)
                     {

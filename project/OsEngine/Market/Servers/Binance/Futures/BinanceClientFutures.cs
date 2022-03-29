@@ -79,7 +79,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private WebSocket _spotSocketClient;
 
-
         private void CreateDataStreams()
         {
             _spotSocketClient = CreateUserDataStream("/" + type_str_selector + "/v1/listenKey");
@@ -228,6 +227,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     return;
                 }
 
+                if (_isDisposed == true)
+                {
+                    return;
+                }
+
                 if (_timeStart.AddMinutes(25) < DateTime.Now)
                 {
                     _timeStart = DateTime.Now;
@@ -282,9 +286,18 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 try
                 {
-                    // var res = CreateQuery( Method.GET, "/fapi/v1/balance", null, true);
+                    string res = null;
 
-                    var res = CreateQuery(Method.GET, "/" + type_str_selector + "/v2/account", null, true);
+                    if (type_str_selector == "dapi")
+                    {
+                        res = CreateQuery(Method.GET, type_str_selector + "/v1/balance", null, true);
+                        return GetAccountInfoFromDFut(res);
+
+                    }
+                    else if (type_str_selector == "fapi")
+                    {
+                        res = CreateQuery(Method.GET, "/" + type_str_selector + "/v2/account", null, true);
+                    }
 
                     if (res == null)
                     {
@@ -300,6 +313,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     return null;
                 }
             }
+        }
+
+        public AccountResponseFutures GetAccountInfoFromDFut(string response)
+        {
+            if(response == null)
+            {
+                return null;
+            }
+
+            AccountResponseFutures resp = new AccountResponseFutures();
+
+            List<AssetFutures> assets = JsonConvert.DeserializeAnonymousType(response, new List<AssetFutures>());
+
+            resp.assets = assets;
+            resp.positions = new List<PositionFutures>();
+
+            return resp;
         }
 
         /// <summary>
@@ -378,7 +408,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 lock (_candleLocker)
                 {
-                    if (jsonCandles == "[]")
+                    if (jsonCandles == null ||
+                        jsonCandles == "[]")
                         return null;
 
                     string res = jsonCandles.Trim(new char[] { '[', ']' });
@@ -1079,7 +1110,37 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
             for (int i = 0; i < oldOpenOrders.Count; i++)
             {
+                if (oldOpenOrders[i].Volume == oldOpenOrders[i].VolumeExecute)
+                {
+                    continue;
+                }
                 HistoryOrderReport myOrder = allOrders.Find(ord => ord.orderId == oldOpenOrders[i].NumberMarket);
+
+                if (myOrder == null)
+                {
+                    for (int i2 = 0; i2 < allOrders.Count; i2++)
+                    {
+                        if (string.IsNullOrEmpty(allOrders[i2].clientOrderId))
+                        {
+                            continue;
+                        }
+
+                        string id = allOrders[i2].clientOrderId.Replace("x-RKXTQ2AK", "");
+
+                        try
+                        {
+                            if (Convert.ToInt32(id) == oldOpenOrders[i].NumberUser)
+                            {
+                                myOrder = allOrders[i2];
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    }
+                }
 
                 if (myOrder == null)
                 {
@@ -1095,12 +1156,29 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     myOrder.status == "PARTIALLY_FILLED")
                 { // order executed / ордер исполнен
 
+                    try
+                    {
+                        if (myOrder.executedQty.ToDecimal() - oldOpenOrders[i].VolumeExecute <= 0)
+                        {
+                            continue;
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+
                     MyTrade trade = new MyTrade();
-                    trade.NumberOrderParent = oldOpenOrders[i].NumberMarket;
+                    trade.NumberOrderParent = myOrder.orderId;
                     trade.NumberTrade = NumberGen.GetNumberOrder(StartProgram.IsOsTrader).ToString();
                     trade.SecurityNameCode = oldOpenOrders[i].SecurityNameCode;
                     trade.Time = new DateTime(1970, 1, 1).AddMilliseconds(Convert.ToDouble(myOrder.updateTime));
                     trade.Side = oldOpenOrders[i].Side;
+                    trade.Price = myOrder.price.ToDecimal();
+                    trade.Volume = myOrder.executedQty.ToDecimal() - oldOpenOrders[i].VolumeExecute;
+
+                    oldOpenOrders[i].SetTrade(trade);
 
                     if (MyTradeEvent != null)
                     {
@@ -1110,7 +1188,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 else
                 {
                     Order newOrder = new Order();
-                    newOrder.NumberMarket = oldOpenOrders[i].NumberMarket;
+                    newOrder.NumberMarket = myOrder.orderId;
                     newOrder.NumberUser = oldOpenOrders[i].NumberUser;
                     newOrder.SecurityNameCode = oldOpenOrders[i].SecurityNameCode;
                     newOrder.State = OrderStateType.Cancel;
@@ -1167,7 +1245,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             }
 
             HistoryOrderReport orderOnBoard =
-                allOrders.Find(ord => ord.clientOrderId == oldOrder.NumberUser.ToString());
+                allOrders.Find(ord => ord.clientOrderId.Replace("x-RKXTQ2AK", "") == oldOrder.NumberUser.ToString());
 
             if (orderOnBoard == null)
             {
@@ -1500,6 +1578,10 @@ namespace OsEngine.Market.Servers.Binance.Futures
                                     UpdatePortfolio(portfolios);
                                 }
                                 continue;
+                            }
+                            else
+                            {
+
                             }
 
                             //ORDER_TRADE_UPDATE

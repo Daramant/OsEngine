@@ -183,6 +183,11 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             try
             {
+                if(_isLoaded)
+                {
+                    return;
+                }
+
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + TabName + @"SpreadSet.txt", false))
                 {
                     string save = "";
@@ -203,14 +208,19 @@ namespace OsEngine.OsTrader.Panels.Tab
             }
         }
 
+        bool _isLoaded = false;
+
         /// <summary>
         /// load / 
         /// загрузить настройки из файла
         /// </summary>
         public void Load()
         {
+            _isLoaded = true;
+
             if (!File.Exists(@"Engine\" + TabName + @"SpreadSet.txt"))
             {
+                _isLoaded = false;
                 return;
             }
             try
@@ -226,6 +236,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                         Tabs.Add(newConnector);
                         Tabs[Tabs.Count - 1].NewCandlesChangeEvent += BotTabIndex_NewCandlesChangeEvent;
                     }
+
                     UserFormula = reader.ReadLine();
 
                     reader.Close();
@@ -233,8 +244,10 @@ namespace OsEngine.OsTrader.Panels.Tab
             }
             catch (Exception)
             {
+                _isLoaded = false;
                 // ignore
             }
+            _isLoaded = false;
         }
 
         /// <summary>
@@ -287,7 +300,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         private void BotTabIndex_NewCandlesChangeEvent(List<Candle> candles)
         {
-            LastTimeCandleUpdate = DateTime.Now;
+            LastTimeCandleUpdate = Tabs[0].MarketTime;
 
             for (int i = 0; i < Tabs.Count; i++)
             {
@@ -1325,8 +1338,6 @@ namespace OsEngine.OsTrader.Panels.Tab
                 oldCandle.Low = Math.Min(Math.Min(o, h), Math.Min(l, c));
                 oldCandle.Open = o;
                 oldCandle.Close = c;
-                oldCandle.Open = Math.Round(candleOne.Open + candleTwo.Open, 8);
-                oldCandle.Close = Math.Round(candleOne.Close + candleTwo.Close, 8);
             }
             else if (sign == "-")
             {
@@ -1364,6 +1375,23 @@ namespace OsEngine.OsTrader.Panels.Tab
                 oldCandle.Low = Math.Min(Math.Min(o, h), Math.Min(l, c));
                 oldCandle.Open = o;
                 oldCandle.Close = c;
+            }
+
+            if(oldCandle.Open > oldCandle.High)
+            {
+                oldCandle.Open = oldCandle.High;
+            }
+            if(oldCandle.Open < oldCandle.Low)
+            {
+                oldCandle.Open = oldCandle.Low;
+            }
+            if (oldCandle.Close > oldCandle.High)
+            {
+                oldCandle.Close = oldCandle.High;
+            }
+            if (oldCandle.Close < oldCandle.Low)
+            {
+                oldCandle.Close = oldCandle.Low;
             }
 
             return oldCandle;

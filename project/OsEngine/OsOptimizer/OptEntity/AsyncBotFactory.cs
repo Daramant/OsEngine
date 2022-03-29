@@ -1,12 +1,14 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿/*
+ * Your rights to use code governed by this license https://github.com/AlexWan/OsEngine/blob/master/LICENSE
+ * Ваши права на использование кода регулируются данной лицензией http://o-s-a.net/doc/license_simple_engine.pdf
+*/
+
+using System.Collections.Generic;
 using System.Threading;
 using OsEngine.Entity;
 using OsEngine.OsTrader.Panels;
 using OsEngine.Robots;
 using System;
-using System.Collections.Generic;
-using System.IO;
 
 namespace OsEngine.OsOptimizer.OptimizerEntity
 {
@@ -15,7 +17,13 @@ namespace OsEngine.OsOptimizer.OptimizerEntity
 
         public AsyncBotFactory()
         {
-            Task.Run(WorkerArea);
+            for (int i = 0; i < 10; i++)
+            {
+                _botsToStart.Add(new List<string>());
+                Thread worker = new Thread(WorkerArea);
+                worker.Name = i.ToString();
+                worker.Start();
+            }
         }
 
         private string _botLocker = "botLocker";
@@ -32,6 +40,9 @@ namespace OsEngine.OsOptimizer.OptimizerEntity
                     {
                         continue;
                     }
+
+                    string starategy = _bots[i].GetNameStrategyType();
+
                     if (_bots[i].NameStrategyUniq == botName &&
                         _bots[i].GetNameStrategyType() == botType)
                     {
@@ -44,78 +55,76 @@ namespace OsEngine.OsOptimizer.OptimizerEntity
                         return bot;
                     }
                 }
+                Thread.Sleep(1);
             }
         }
 
         public void CreateNewBots(List<string> botsName, string botType, bool isScript, StartProgram startProgramm)
         {
-            lock (_lockStr)
+            _botType = botType;
+            _isActivate = false;
+            for (int i = 0; i < _botsToStart.Count; i++)
             {
-                _targetChange = true;
-                _bots = new List<BotPanel>();
-                _botType = botType;
-                _botNames = botsName;
-                _isScript = isScript;
-                _startProgramm = startProgramm;
+                List<string> names = _botsToStart[i];
+
+                for (int i2 = i; i2 < botsName.Count; i2 += _botsToStart.Count)
+                {
+                    names.Add(botsName[i2]);
+                }
             }
+
+            _isScript = isScript;
+            _startProgramm = startProgramm;
+            _isActivate = true;
         }
+
+        bool _isActivate;
+
+        List<List<string>> _botsToStart = new List<List<string>>();
 
         public List<BotPanel> _bots = new List<BotPanel>();
 
-        private List<string> _botNames;
-
         private string _botType;
-
-        private bool _targetChange;
 
         private bool _isScript;
 
         StartProgram _startProgramm;
 
-        private string _lockStr = "someStr";
-
-
         private void WorkerArea()
         {
+            int num = Convert.ToInt32(Thread.CurrentThread.Name);
+
             while (true)
             {
+                Thread.Sleep(10);
                 if (MainWindow.ProccesIsWorked == false)
                 {
                     return;
                 }
 
-                if (_botNames == null ||
-                    _botNames.Count == 0)
+                if (_isActivate == false)
                 {
-                    Thread.Sleep(500);
                     continue;
                 }
 
-                for (int i = 0; i < _botNames.Count; i++)
+                if (_botsToStart[num].Count != 0)
                 {
-                    lock (_lockStr)
-                    {
-                        if (_targetChange == true)
-                        {
-                            Thread.Sleep(500);
-                            _targetChange = false;
-                            break;
-                        }
-                        BotPanel bot = BotFactory.GetStrategyForName(_botType, _botNames[i], _startProgramm, _isScript);
-
-                        lock (_botLocker)
-                        {
-                            _bots.Add(bot);
-                        }
-                        if (i + 1 == _botNames.Count)
-                        {
-                            _botNames.Clear();
-                            break;
-                        }
-                    }
+                    Load(_botsToStart[num]);
                 }
+            }
+        }
 
+        private void Load(List<string> names)
+        {
+            while (names.Count != 0)
+            {
 
+                BotPanel bot = BotFactory.GetStrategyForName(_botType, names[0], _startProgramm, _isScript);
+                names.RemoveAt(0);
+                lock (_botLocker)
+                {
+                    _bots.Add(bot);
+                }
             }
         }
     }

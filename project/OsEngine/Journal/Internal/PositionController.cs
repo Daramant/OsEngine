@@ -91,8 +91,6 @@ namespace OsEngine.Journal.Internal
 
             ControllersToCheck.Add(this);
 
-            CreateTable();
-
             if(_startProgram != StartProgram.IsOsOptimizer)
             {
                 Load();
@@ -983,6 +981,13 @@ namespace OsEngine.Journal.Internal
                     return;
                 }
 
+                if(_gridOpenDeal == null ||
+                    _gridCloseDeal == null)
+                {
+                    return;
+                }
+
+
                 try
                 {
                     while (_positionsToPaint.Count != 0)
@@ -1051,14 +1056,24 @@ namespace OsEngine.Journal.Internal
         /// </summary>
         private void ClearPositionsGrid()
         {
+            if(_gridOpenDeal == null)
+            {
+                return;
+            }
             if (_gridOpenDeal.InvokeRequired)
             {
                 _gridOpenDeal.Invoke(new Action(ClearPositionsGrid));
                 return;
             }
 
-            _gridOpenDeal.Rows.Clear();
-            _gridCloseDeal.Rows.Clear();
+            if(_gridOpenDeal != null)
+            {
+                _gridOpenDeal.Rows.Clear();
+            }
+            else if(_gridCloseDeal != null)
+            {
+                _gridCloseDeal.Rows.Clear();
+            }
         }
 
         /// <summary>
@@ -1097,6 +1112,8 @@ namespace OsEngine.Journal.Internal
                 _hostCloseDeal.Dispatcher.Invoke(new Action<WindowsFormsHost, WindowsFormsHost>(StartPaint), dataGridOpenDeal, dataGridCloseDeal);
                 return;
             }
+
+            CreateTable();
 
             _hostOpenDeal = dataGridOpenDeal;
             _hostCloseDeal = dataGridCloseDeal;
@@ -1137,6 +1154,11 @@ namespace OsEngine.Journal.Internal
         {
             try
             {
+                if(_gridOpenDeal == null)
+                {
+                    return;
+                }
+
                 if (_gridOpenDeal.InvokeRequired)
                 {
                     _gridOpenDeal.Invoke(new Action<Position>(PaintPosition), position);
@@ -1202,11 +1224,20 @@ namespace OsEngine.Journal.Internal
                         if ((int)_gridOpenDeal.Rows[i].Cells[0].Value == position.Number)
                         {
                             _gridOpenDeal.Rows.Remove(_gridOpenDeal.Rows[i]);
-                            _gridOpenDeal.Rows.Insert(i, GetRow(position));
+
+                            if (position.State != PositionStateType.Deleted)
+                            {
+                                _gridOpenDeal.Rows.Insert(i, GetRow(position));
+                                return;
+                            }
                             return;
                         }
                     }
-                    _gridOpenDeal.Rows.Insert(0, GetRow(position));
+
+                    if (position.State != PositionStateType.Deleted)
+                    {
+                        _gridOpenDeal.Rows.Insert(0, GetRow(position));
+                    }
                 }
             }
             catch (Exception error)

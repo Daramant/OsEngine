@@ -199,13 +199,13 @@ namespace OsEngine.Market.Servers.FTX
 
         private List<Candle> GetCandles(int oldInterval, string securityName, DateTime startTime, DateTime endTime)
         {
-            if(oldInterval < _supportedIntervals.First().Key)
+            if (oldInterval < _supportedIntervals.First().Key)
             {
                 return null;
             }
 
             List<Candle> candles = new List<Candle>();
-            
+
             var needIntervalForQuery =
                 CandlesCreator.DetermineAppropriateIntervalForRequest(oldInterval, _supportedIntervals,
                     out var needInterval);
@@ -228,7 +228,7 @@ namespace OsEngine.Market.Servers.FTX
                     midTime = endTime;
                 }
 
-                if(_ftxRestApi == null)
+                if (_ftxRestApi == null)
                 {
                     break;
                 }
@@ -244,7 +244,12 @@ namespace OsEngine.Market.Servers.FTX
                     actualTime = candles[candles.Count - 1].TimeStart.AddSeconds(needInterval);
                     midTime = actualTime + step;
                 }
-                Thread.Sleep(1000);
+                else
+                {
+                    actualTime = actualTime.AddDays(2);
+                    midTime = actualTime + step;
+                }
+                Thread.Sleep(200);
             }
 
             if (candles.Count == 0)

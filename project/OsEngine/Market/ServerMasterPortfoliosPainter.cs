@@ -73,6 +73,12 @@ namespace OsEngine.Market
         /// </summary>
         public void StartPaint()
         {
+            if(_positionHost.Dispatcher.CheckAccess() == false)
+            {
+                _positionHost.Dispatcher.Invoke(new Action(StartPaint));
+                return;
+            }
+
             try
             {
                 _positionHost.Child = _gridPosition;
@@ -264,6 +270,23 @@ namespace OsEngine.Market
                 {
                     // ignore
                 }
+
+                while (_portfolios != null && _portfolios.Count > 250)
+                {
+                    _portfolios.RemoveAt(500);
+                }
+
+                for(int i = 0;i < _portfolios.Count;i++)
+                {
+                    List<PositionOnBoard> poses = _portfolios[i].GetPositionOnBoard();
+                    
+                    while (poses != null &&
+                        poses.Count > 500)
+                    {
+                        poses.RemoveAt(500);
+                    }
+                }
+
 
                 if (!_positionHost.CheckAccess())
                 {

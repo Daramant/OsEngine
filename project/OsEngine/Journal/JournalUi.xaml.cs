@@ -81,8 +81,10 @@ namespace OsEngine.Journal
             TabItem4.Header = OsLocalization.Journal.TabItem4;
             TabItem5.Header = OsLocalization.Journal.TabItem5;
             TabItem6.Header = OsLocalization.Journal.TabItem6;
-
+            
+ 
             Closing += JournalUi_Closing;
+
         }
 
         private void JournalUi_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -751,7 +753,14 @@ namespace OsEngine.Journal
             profitBar.YAxisType = AxisType.Secondary;
             profitBar.ChartArea = "ChartAreaProfitBar";
             profitBar.ShadowOffset = 2;
-           
+
+            Series nullLine = new Series("SeriesNullLine");
+            nullLine.ChartType = SeriesChartType.Line;
+            nullLine.YAxisType = AxisType.Secondary;
+            nullLine.ChartArea = "ChartAreaProfit";
+            nullLine.ShadowOffset = 0;
+
+
 
             try
             {
@@ -832,7 +841,13 @@ namespace OsEngine.Journal
                 _chartEquity.Series.Add(profitShort);
                 _chartEquity.Series.Add(profitBar);
 
-                if(minYval != decimal.MaxValue &&
+                nullLine.Points.AddXY(0, 0);
+                nullLine.Points.AddXY(positionsAll.Count, 0);
+
+                _chartEquity.Series.Add(nullLine);
+
+
+                if (minYval != decimal.MaxValue &&
                     maxYVal != 0)
                 {
                     _chartEquity.ChartAreas[0].AxisY2.Maximum = (double)maxYVal;
@@ -1969,13 +1984,45 @@ namespace OsEngine.Journal
         {
             _closePositionGrid.Rows.Clear();
 
-            for (int i = 0; i < positionsAll.Count; i++)
+            if(positionsAll.Count == 0)
+            {
+                return;
+            }
+
+            List<Position> closePositions = new List<Position>();
+
+            for(int i = 0;i < positionsAll.Count;i++)
             {
                 if (positionsAll[i].State == PositionStateType.Done ||
                     positionsAll[i].State == PositionStateType.OpeningFail)
                 {
-                    _closePositionGrid.Rows.Insert(0, GetRow(positionsAll[i]));
+                    closePositions.Add(positionsAll[i]);
                 }
+            }
+
+            if(closePositions.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < closePositions.Count; i++)
+            {
+                for (int i2 = i; i2 < closePositions.Count; i2++)
+                {
+                    if(closePositions[i].TimeClose > closePositions[i2].TimeClose)
+                    {
+                        Position pos = closePositions[i2];
+                        closePositions[i2] = closePositions[i];
+                        closePositions[i] = pos;
+                    }
+                }
+            }
+
+           
+
+            for (int i = 0; i < closePositions.Count; i++)
+            {
+                 _closePositionGrid.Rows.Insert(0, GetRow(closePositions[i]));
             }
         }
         // messages to the log
@@ -1998,7 +2045,6 @@ namespace OsEngine.Journal
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
-
     }
 
     /// <summary>
@@ -2010,6 +2056,21 @@ namespace OsEngine.Journal
         public string BotName;
 
         public List<BotTabJournal> _Tabs;
+
+        public List<Position> AllPositions
+        {
+            get
+            {
+                List<Position> poses = new List<Position>();
+
+                for(int i = 0;i < _Tabs.Count;i++)
+                {
+                    poses.AddRange(_Tabs[i].Journal.AllPosition);
+                }
+
+                return poses;
+            }
+        }
     }
 
     /// <summary>
@@ -2089,4 +2150,3 @@ namespace OsEngine.Journal
         public string Security;
     }
 }
-

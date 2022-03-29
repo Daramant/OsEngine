@@ -1,4 +1,9 @@
-﻿using System;
+﻿/*
+ * Your rights to use code governed by this license https://github.com/AlexWan/OsEngine/blob/master/LICENSE
+ * Ваши права на использование кода регулируются данной лицензией http://o-s-a.net/doc/license_simple_engine.pdf
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using OsEngine.Entity;
@@ -108,13 +113,13 @@ namespace OsEngine.OsOptimizer
         {
             ReportsToFazes = new List<OptimazerFazeReport>();
 
-            int countBots = BotCountOneFaze();
+            int countBots = BotCountOneFaze(_parameters,_parametersOn);
 
-            SendLogMessage(OsLocalization.Optimizer.Message4 + countBots, LogMessageType.System);
+            _countAllServersMax = countBots * (_master.IterationCount * 2);
+
+            SendLogMessage(OsLocalization.Optimizer.Message4 + _countAllServersMax, LogMessageType.System);
 
             DateTime timeStart = DateTime.Now;
-
-            _countAllServersMax = countBots;
 
             for (int i = 0; i < _master.Fazes.Count; i++)
             {
@@ -176,7 +181,7 @@ namespace OsEngine.OsOptimizer
 
             for (int i = 0; i < botCount; i++)
             {
-                string botName = (startServerIndex + i) + " " + faze;
+                string botName = (startServerIndex + i) + " OpT " + faze;
                 botNames.Add(botName);
             }
 
@@ -186,9 +191,6 @@ namespace OsEngine.OsOptimizer
         private void StartAsuncBotFactoryOutOfSample(OptimazerFazeReport reportFiltred, string botType, bool isScript, string faze)
         {
             List<string> botNames = new List<string>();
-            int startServerIndex = _serverNum;
-
-            // reportFiltred.Reports[i].BotName.Replace(" InSample", "") + " OutOfSample"
 
             for (int i = 0; i < reportFiltred.Reports.Count; i++)
             {
@@ -205,11 +207,11 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private Thread _primeThreadWorker;
 
-        public int BotCountOneFaze()
+        public int BotCountOneFaze(List<IIStrategyParameter> param,List<bool> paramsOn)
         {
-            List<IIStrategyParameter> allParam = _parameters;
+            List<IIStrategyParameter> allParam = param; 
 
-            for (int i = 0; i < _parameters.Count; i++)
+            for (int i = 0; i < allParam.Count; i++)
             {
                 if (allParam[i].Type == StrategyParameterType.Int)
                 {
@@ -221,7 +223,7 @@ namespace OsEngine.OsOptimizer
                 }
             }
 
-            List<bool> allOptimezedParam = _parametersOn;
+            List<bool> allOptimezedParam = paramsOn;
 
 
             // 1 consider how many passes we need to do in the first phase/
@@ -316,7 +318,7 @@ namespace OsEngine.OsOptimizer
                 }
             }
 
-            return countBots * (_master.IterationCount * 2);
+            return countBots;
         }
 
         public List<OptimazerFazeReport> ReportsToFazes = new List<OptimazerFazeReport>();
@@ -440,8 +442,8 @@ namespace OsEngine.OsOptimizer
                 }
 
                 //SendLogMessage("BotInSample" ,LogMessageType.System);
-
-                StartNewBot(_parameters, optimizeParamCurrent, report, " InSample");
+                // (startServerIndex + i) + " OpT " + faze;
+                StartNewBot(_parameters, optimizeParamCurrent, report, " OpT InSample");
             }
 
             while (true)
@@ -640,7 +642,7 @@ namespace OsEngine.OsOptimizer
 
             while (bot.IsConnected == false)
             {
-                Thread.Sleep(20);
+                Thread.Sleep(1);
 
                 if (timeStartWaiting.AddSeconds(2000) < DateTime.Now)
                 {
@@ -746,7 +748,7 @@ namespace OsEngine.OsOptimizer
             {
                 bot.TabsSimple[i].Connector.ServerType = ServerType.Optimizer;
                 bot.TabsSimple[i].Connector.PortfolioName = server.Portfolios[0].Number;
-                bot.TabsSimple[i].Connector.NamePaper = _master.TabsSimpleNamesAndTimeFrames[i].NameSecurity;
+                bot.TabsSimple[i].Connector.SecurityName = _master.TabsSimpleNamesAndTimeFrames[i].NameSecurity;
                 bot.TabsSimple[i].Connector.TimeFrame =
                     _master.TabsSimpleNamesAndTimeFrames[i].TimeFrame;
                 bot.TabsSimple[i].Connector.ServerUid = server.NumberServer;
@@ -778,7 +780,7 @@ namespace OsEngine.OsOptimizer
 
                     bot.TabsIndex[i].Tabs[i2].ServerType = ServerType.Optimizer;
                     bot.TabsIndex[i].Tabs[i2].PortfolioName = server.Portfolios[0].Number;
-                    bot.TabsIndex[i].Tabs[i2].NamePaper = _master.TabsIndexNamesAndTimeFrames[i].NamesSecurity[i2];
+                    bot.TabsIndex[i].Tabs[i2].SecurityName = _master.TabsIndexNamesAndTimeFrames[i].NamesSecurity[i2];
                     bot.TabsIndex[i].Tabs[i2].ServerUid = server.NumberServer;
                     bot.TabsIndex[i].Tabs[i2].TimeFrame =
                         _master.TabsIndexNamesAndTimeFrames[i].TimeFrame;
@@ -858,7 +860,7 @@ namespace OsEngine.OsOptimizer
             timeStartWaiting = DateTime.Now;
             while (bot.TabsSimple[0].CandlesAll == null
                    ||
-                   bot.TabsSimple[0].TimeServerCurrent.AddDays(1) < reportFaze.Faze.TimeEnd)
+                   bot.TabsSimple[0].TimeServerCurrent.AddHours(1) < reportFaze.Faze.TimeEnd)
             {
                 Thread.Sleep(20);
                 if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
@@ -866,6 +868,8 @@ namespace OsEngine.OsOptimizer
                     break;
                 }
             }
+
+            Thread.Sleep(2000);
 
             return bot;
         }
@@ -909,7 +913,12 @@ namespace OsEngine.OsOptimizer
 
             lock (_serverRemoveLocker)
             {
-                BotPanel bot = _botsInTest.Find(b => b.TabsSimple[0].Connector.ServerUid == serverNum);
+                BotPanel bot = _botsInTest.Find(
+                b =>
+                b != null &&
+                b.TabsSimple[0] != null &&
+                b.TabsSimple[0].Connector != null &&
+                b.TabsSimple[0].Connector.ServerUid == serverNum);
 
                 if (bot != null)
                 {
@@ -919,6 +928,10 @@ namespace OsEngine.OsOptimizer
                     bot.Clear();
                     bot.Delete();
                    _botsInTest.Remove(bot);
+                }
+                else
+                {
+
                 }
 
                 for (int i = 0; i < _servers.Count; i++)

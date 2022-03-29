@@ -305,8 +305,6 @@ namespace OsEngine.Market.Servers.Binance.Spot
             return trades;
         }
 
-
-
         /// <summary>
         /// request order state
         /// запросить статус ордеров
@@ -675,6 +673,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
 
                 security.PriceLimitLow = sec.filters[0].minPrice.ToDecimal();
                 security.PriceLimitHigh = sec.filters[0].maxPrice.ToDecimal();
+                
 
                 if (security.PriceStep < 1)
                 {
@@ -684,6 +683,19 @@ namespace OsEngine.Market.Servers.Binance.Spot
                 else
                 {
                     security.Decimals = 0;
+                }
+
+                if (sec.filters.Count > 1 &&
+                   sec.filters[2] != null &&
+                   sec.filters[2].minQty != null)
+                {
+                    decimal minQty = sec.filters[2].minQty.ToDecimal();
+                    security.MinTradeAmount = minQty;
+                    string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
+                    if(qtyInStr.Split('.').Length > 1)
+                    {
+                        security.DecimalsVolume = qtyInStr.Split('.')[1].Length;
+                    }
                 }
 
                 security.State = SecurityStateType.Activ;

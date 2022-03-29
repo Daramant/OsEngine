@@ -617,8 +617,8 @@ namespace OsEngine.Market.Servers.Finam
                 sec.Name = _finamSecurities[i].Name;
                 sec.NameId = _finamSecurities[i].Id;
                 sec.NameClass = _finamSecurities[i].Market;
-                sec.PriceStep = 1;
-                sec.PriceStepCost = 1;
+                sec.PriceStep = 0;
+                sec.PriceStepCost = 0;
 
                 _securities.Add(sec);
             }
@@ -796,7 +796,7 @@ namespace OsEngine.Market.Servers.Finam
         /// take the instrument as a Security class by the name of the tool
         /// взять инструмент в виде класса Security, по имени инструмента 
         /// </summary>
-        public Security GetSecurityForName(string name)
+        public Security GetSecurityForName(string name, string securityClass)
         {
             if (_securities == null)
             {
@@ -875,14 +875,14 @@ namespace OsEngine.Market.Servers.Finam
         private object _lockerStarter = new object();
 
         /// <summary>
-        /// start downloading data on instrument
+        /// start uploading data on instrument
         /// Начать выгрузку данных по инструменту. 
         /// </summary>
-        /// <param name="namePaper">security name for running / имя бумаги которую будем запускать</param>
-        /// <param name="timeFrameBuilder">object with timeframe / объект несущий в себе таймфрейм</param>
-        /// <returns>In case of luck, returns CandleSeries / В случае удачи возвращает CandleSeries
-        /// in case of failure null / в случае неудачи null</returns>
-        public CandleSeries StartThisSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder)
+        /// <param name="securityName"> security name for running / имя бумаги которую будем запускать</param>
+        /// <param name="timeFrameBuilder"> object that has data about timeframe / объект несущий в себе данные о таймФрейме</param>
+        /// <param name="securityClass"> security class for running / класс бумаги которую будем запускать</param>
+        /// <returns> returns CandleSeries if successful else null / В случае удачи возвращает CandleSeries в случае неудачи null</returns>
+        public CandleSeries StartThisSecurity(string securityName, TimeFrameBuilder timeFrameBuilder, string securityClass)
         {
             return null;
         }
@@ -950,7 +950,8 @@ namespace OsEngine.Market.Servers.Finam
         /// <param name="neadToUpdate">whether to automatically update / нужно ли автоматически обновлять</param>
         /// <returns>In case of luck, returns CandleSeries / В случае удачи возвращает CandleSeries
         /// in case of failure null / в случае неудачи null</returns>
-        public CandleSeries GetCandleDataToSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
+        public CandleSeries GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
+            DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
         {
             try
             {
@@ -962,7 +963,7 @@ namespace OsEngine.Market.Servers.Finam
                 // one by one / дальше по одному
                 lock (_lockerStarter)
                 {
-                    if (namePaper == null)
+                    if (securityName == null)
                     {
                         return null;
                     }
@@ -988,7 +989,7 @@ namespace OsEngine.Market.Servers.Finam
 
                     for (int i = 0; _securities != null && i < _securities.Count; i++)
                     {
-                        if (_securities[i].NameId == namePaper)
+                        if (_securities[i].NameId == securityName)
                         {
                             security = _securities[i];
                             break;
@@ -1051,7 +1052,7 @@ namespace OsEngine.Market.Servers.Finam
         /// взять тиковые данные по инструменту за определённый период
         /// </summary>
         /// <returns></returns>
-        public bool GetTickDataToSecurity(string namePaper, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
+        public bool GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
             try
             {
@@ -1063,7 +1064,7 @@ namespace OsEngine.Market.Servers.Finam
                 // one by one / дальше по одному
                 lock (_lockerStarter)
                 {
-                    if (namePaper == null)
+                    if (securityName == null)
                     {
                         return false;
                     }
@@ -1090,7 +1091,7 @@ namespace OsEngine.Market.Servers.Finam
 
                     for (int i = 0; _securities != null && i < _securities.Count; i++)
                     {
-                        if (_securities[i].NameId == namePaper)
+                        if (_securities[i].NameId == securityName)
                         {
                             security = _securities[i];
                             break;
@@ -1749,7 +1750,7 @@ namespace OsEngine.Market.Servers.Finam
 
             while (timeStart.Date != timeEnd.Date)
             {
-                string tradesOneDay = GetTrades(timeStart.Date, timeStart.Date);
+                string tradesOneDay = GetTrades(timeStart.Date, timeStart.Date,1);
                 timeStart = timeStart.AddDays(1);
 
                 if (tradesOneDay != null)
@@ -1760,7 +1761,7 @@ namespace OsEngine.Market.Servers.Finam
                 GC.WaitForPendingFinalizers();
             }
 
-            string tradesToday = GetTrades(timeStart.Date, timeStart.Date);
+            string tradesToday = GetTrades(timeStart.Date, timeStart.Date,1);
 
             if (tradesToday != null)
             {
@@ -1777,7 +1778,7 @@ namespace OsEngine.Market.Servers.Finam
         /// <param name="timeStart"></param>
         /// <param name="timeEnd"></param>
         /// <returns></returns>
-        private string GetTrades(DateTime timeStart, DateTime timeEnd)
+        private string GetTrades(DateTime timeStart, DateTime timeEnd, int iteration)
         {
             SendLogMessage(OsLocalization.Market.Message56 + SecurityFinam.Name +
                            OsLocalization.Market.Message57 + timeStart.Date, LogMessageType.System);
@@ -1906,12 +1907,54 @@ namespace OsEngine.Market.Servers.Finam
                 return null;
             }
 
+            DateTime timeWhaiting = DateTime.Now;
+
             while (true)
             {
                 Thread.Sleep(1000);
                 if (_tickLoaded)
                 {
                     break;
+                }
+
+                if(timeWhaiting.AddMinutes(10) < DateTime.Now)
+                {
+                    // пытаемся дважды запросить данные рекурсией
+                    // если не выходит, возвращаем null
+                    if(iteration == 1)
+                    {
+                        iteration++;
+                        wb.CancelAsync();
+                        wb.Dispose();
+                        wb.DownloadFileCompleted -= wb_DownloadFileCompleted;
+                        try
+                        {
+                            File.Delete(fileName);
+                        }
+                        catch
+                        {
+
+                        }
+                        
+                        Thread.Sleep(5000);
+                        return GetTrades(timeStart, timeEnd, iteration);
+                    }
+                    else
+                    {
+                        wb.CancelAsync();
+                        wb.DownloadFileCompleted -= wb_DownloadFileCompleted;
+                        wb.Dispose();
+                        try
+                        {
+                            File.Delete(fileName);
+                        }
+                        catch
+                        {
+
+                        }
+                        Thread.Sleep(5000);
+                        return null;
+                    }
                 }
             }
             wb.Dispose();
@@ -1928,6 +1971,11 @@ namespace OsEngine.Market.Servers.Finam
             while (!reader.EndOfStream)
             {
                 string[] s = reader.ReadLine().Split(',');
+
+                if(s.Length < 5)
+                {
+                    continue;
+                }
 
                 StringBuilder builder = new StringBuilder();
 

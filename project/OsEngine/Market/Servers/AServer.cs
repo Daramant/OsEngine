@@ -100,6 +100,9 @@ namespace OsEngine.Market.Servers
                 Task task3 = new Task(MyTradesBeepThread);
                 task3.Start();
 
+                Task task4 = new Task(SaveLoadOrdersThreadArea);
+                task4.Start();
+
                 _serverIsStart = true;
 
             }
@@ -544,7 +547,7 @@ namespace OsEngine.Market.Servers
                 return;
             }
 
-            LastStartServerTime = DateTime.Now.AddMinutes(-5);
+            LastStartServerTime = DateTime.Now.AddSeconds(-300);
 
             _serverStatusNead = ServerConnectStatus.Connect;
         }
@@ -638,7 +641,7 @@ namespace OsEngine.Market.Servers
 
                     if ((ServerRealization.ServerStatus != ServerConnectStatus.Connect)
                         && _serverStatusNead == ServerConnectStatus.Connect &&
-                       LastStartServerTime.AddSeconds(300) < DateTime.Now)
+                       LastStartServerTime.AddSeconds(100) < DateTime.Now)
                     {
                         SendLogMessage(OsLocalization.Market.Message8, LogMessageType.System);
                         ServerRealization.Dispose();
@@ -649,12 +652,8 @@ namespace OsEngine.Market.Servers
                             Portfolios.Clear();
                         }
 
-                        if (_candleManager != null)
-                        {
-                            _candleManager.Dispose();
-                            _candleManager = null;
-                        }
-
+                        DeleteCandleManager();
+ 
                         ServerRealization.Connect();
                         LastStartServerTime = DateTime.Now;
 
@@ -668,11 +667,7 @@ namespace OsEngine.Market.Servers
                         SendLogMessage(OsLocalization.Market.Message9, LogMessageType.System);
                         ServerRealization.Dispose();
 
-                        if (_candleManager != null)
-                        {
-                            _candleManager.Dispose();
-                            _candleManager = null;
-                        }
+                        DeleteCandleManager();
 
                         continue;
                     }
@@ -705,7 +700,8 @@ namespace OsEngine.Market.Servers
                     SendLogMessage(error.ToString(), LogMessageType.Error);
                     ServerStatus = ServerConnectStatus.Disconnect;
                     ServerRealization.Dispose();
-                    _candleManager = null;
+
+                    DeleteCandleManager();
 
                     Thread.Sleep(5000);
                     // reconnect / переподключаемся
@@ -755,6 +751,17 @@ namespace OsEngine.Market.Servers
                 _candleManager = new CandleManager(this);
                 _candleManager.CandleUpdateEvent += _candleManager_CandleUpdateEvent;
                 _candleManager.LogMessageEvent += SendLogMessage;
+            }
+        }
+
+        private void DeleteCandleManager()
+        {
+            if (_candleManager != null)
+            {
+                _candleManager.CandleUpdateEvent -= _candleManager_CandleUpdateEvent;
+                _candleManager.LogMessageEvent -= SendLogMessage;
+                _candleManager.Dispose();
+                _candleManager = null;
             }
         }
 
@@ -1130,13 +1137,31 @@ namespace OsEngine.Market.Servers
         /// take the instrument as a Security by name of instrument
         /// взять инструмент в виде класса Security, по имени инструмента 
         /// </summary>
-        public Security GetSecurityForName(string name)
+        public Security GetSecurityForName(string securityName, string securityClass)
         {
             if (_securities == null)
             {
                 return null;
             }
-            return _securities.Find(securiti => securiti.Name == name);
+
+            for (int i = 0; i < _securities.Count; i++)
+            {
+                if(_securities[i].Name == securityName &&
+                    _securities[i].NameClass == securityClass)
+                {
+                    return _securities[i];
+                }
+            }
+
+            for (int i = 0; i < _securities.Count; i++)
+            {
+                if (_securities[i].Name == securityName)
+                {
+                    return _securities[i];
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -1234,19 +1259,20 @@ namespace OsEngine.Market.Servers
         private object _lockerStarter = new object();
 
         /// <summary>
-        /// start downloading of this instrument
-        /// начать выкачивать данный иснтрументн
+        /// start uploading data on instrument
+        /// Начать выгрузку данных по инструменту. 
         /// </summary>
-        /// <param name="namePaper"> security name / название инструмента </param>
-        /// <param name="timeFrameBuilder"> object that has data about needed for series timeframe / объект несущий в себе данные о ТаймФрейме нужном для серии </param>
-        /// <returns> if everything is going well, CandleSeries returns generated candle object / в случае успешного запуска возвращает CandleSeries, объект генерирующий свечи </returns>
-        public CandleSeries StartThisSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder)
+        /// <param name="securityName"> security name for running / имя бумаги которую будем запускать</param>
+        /// <param name="timeFrameBuilder"> object that has data about timeframe / объект несущий в себе данные о таймФрейме</param>
+        /// <param name="securityClass"> security class for running / класс бумаги которую будем запускать</param>
+        /// <returns> returns CandleSeries if successful else null / В случае удачи возвращает CandleSeries в случае неудачи null</returns>
+        public CandleSeries StartThisSecurity(string securityName, TimeFrameBuilder timeFrameBuilder, string securityClass)
         {
             try
             {
                 lock (_lockerStarter)
                 {
-                    if (namePaper == "")
+                    if (securityName == "")
                     {
                         return null;
                     }
@@ -1280,7 +1306,8 @@ namespace OsEngine.Market.Servers
                         {
                             continue;
                         }
-                        if (_securities[i].Name == namePaper)
+                        if (_securities[i].Name == securityName &&
+                            _securities[i].NameClass == securityClass)
                         {
                             security = _securities[i];
                             break;
@@ -1368,8 +1395,8 @@ namespace OsEngine.Market.Servers
         /// take the candle history for a period
         /// взять историю свечей за период
         /// </summary>
-        public CandleSeries GetCandleDataToSecurity(string namePaper, TimeFrameBuilder timeFrameBuilder, DateTime startTime,
-            DateTime endTime, DateTime actualTime, bool neadToUpdate)
+        public CandleSeries GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
+            DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
         {
             if (Portfolios == null || Securities == null)
             {
@@ -1396,11 +1423,24 @@ namespace OsEngine.Market.Servers
 
             for (int i = 0; _securities != null && i < _securities.Count; i++)
             {
-                if (_securities[i].Name == namePaper ||
-                    _securities[i].NameId == namePaper)
+                if(_securities[i].Name == securityName &&
+                    _securities[i].NameClass == securityClass)
                 {
                     security = _securities[i];
                     break;
+                }
+            }
+
+            if (security == null)
+            {
+                for (int i = 0; _securities != null && i < _securities.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(_securities[i].NameId) == false &&
+                        _securities[i].NameId == securityName)
+                    {
+                        security = _securities[i];
+                        break;
+                    }
                 }
             }
 
@@ -1445,7 +1485,7 @@ namespace OsEngine.Market.Servers
         /// take ticks data for a period
         /// взять тиковые данные за период
         /// </summary>
-        public bool GetTickDataToSecurity(string namePaper, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
+        public bool GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
             if (Portfolios == null || Securities == null)
             {
@@ -1477,7 +1517,8 @@ namespace OsEngine.Market.Servers
 
             for (int i = 0; _securities != null && i < _securities.Count; i++)
             {
-                if (_securities[i].Name == namePaper)
+                if (_securities[i].Name == securityName &&
+                    _securities[i].NameClass == securityClass)
                 {
                     security = _securities[i];
                     break;
@@ -1488,7 +1529,8 @@ namespace OsEngine.Market.Servers
             {
                 for (int i = 0; _securities != null && i < _securities.Count; i++)
                 {
-                    if (_securities[i].NameId == namePaper)
+                    if (string.IsNullOrEmpty(_securities[i].NameId) == false &&
+                        _securities[i].NameId == securityName)
                     {
                         security = _securities[i];
                         break;
@@ -1586,7 +1628,7 @@ namespace OsEngine.Market.Servers
 
                         if (_currentBestBid != besBid || _currentBestAsk != bestAsk)
                         {
-                            Security sec = GetSecurityForName(myDepth.SecurityNameCode);
+                            Security sec = GetSecurityForName(myDepth.SecurityNameCode,"");
                             if (sec != null)
                             {
                                 _currentBestBid = besBid;
@@ -1839,6 +1881,8 @@ namespace OsEngine.Market.Servers
             _myTradesToSend.Enqueue(trade);
             _myTrades.Add(trade);
             _neadToBeepOnTrade = true;
+
+            UpDateMyTrade(trade);
         }
 
         /// <summary>
@@ -1954,6 +1998,8 @@ namespace OsEngine.Market.Servers
                     _myTradesToSend.Enqueue(_myTrades[i]);
                 }
             }
+
+            UpDateOrder(myOrder);
         }
 
         /// <summary>
@@ -1985,6 +2031,8 @@ namespace OsEngine.Market.Servers
 
             _ordersToExecute.Enqueue(ord);
 
+            _myExecuteOrders.Add(order);
+
             SendLogMessage(OsLocalization.Market.Message19 + order.Price +
                            OsLocalization.Market.Message20 + order.Side +
                            OsLocalization.Market.Message21 + order.Volume +
@@ -2009,6 +2057,7 @@ namespace OsEngine.Market.Servers
             ord.OrderSendType = OrderSendType.Cancel;
 
             _ordersToExecute.Enqueue(ord);
+            _myCanselOrders.Add(order);
 
             SendLogMessage(OsLocalization.Market.Message24 + order.NumberUser, LogMessageType.System);
         }
@@ -2018,6 +2067,245 @@ namespace OsEngine.Market.Servers
         /// изменился ордер
         /// </summary>
         public event Action<Order> NewOrderIncomeEvent;
+
+        // хранение ордеров и запросы их статуса у сервера
+
+        private void UpDateOrder(Order order)
+        {
+            for(int i = 0;i < _myExecuteOrders.Count;i++)
+            {
+               if(_myExecuteOrders[i].NumberUser == order.NumberUser)
+                {
+                    CopySettings(order, _myExecuteOrders[i]);
+                    _needToSaveOrders = true;
+                    break;
+                }
+            }
+            for (int i = 0; i < _myCanselOrders.Count; i++)
+            {
+                if (_myCanselOrders[i].NumberUser == order.NumberUser)
+                {
+                    CopySettings(order, _myCanselOrders[i]);
+                    _needToSaveOrders = true;
+                    break;
+                }
+            }
+        }
+
+        private void CopySettings(Order orderToCopy, Order order)
+        {
+            order.NumberMarket = orderToCopy.NumberMarket;
+            order.State = orderToCopy.State;
+            order.VolumeExecute = orderToCopy.VolumeExecute;
+        }
+
+        private void UpDateMyTrade(MyTrade trade)
+        {
+            for (int i = 0; i < _myExecuteOrders.Count; i++)
+            {
+                if (_myExecuteOrders[i].NumberMarket == trade.NumberOrderParent)
+                {
+                    _myExecuteOrders[i].SetTrade(trade);
+                    _needToSaveOrders = true;
+                    return;
+                }
+            }
+
+            for (int i = 0; i < _myCanselOrders.Count; i++)
+            {
+                if (_myCanselOrders[i].NumberMarket == trade.NumberOrderParent)
+                {
+                    _myCanselOrders[i].SetTrade(trade);
+                    _needToSaveOrders = true;
+                    return;
+                }
+            }
+        }
+
+        private List<Order> _myExecuteOrders = new List<Order>();
+
+        private List<Order> _myCanselOrders = new List<Order>();
+
+        private DateTime _lastTimeCheckOrders = DateTime.MinValue;
+
+        int myExecureOrdersCount;
+
+        int myCanselOrdersCount;
+
+        bool _needToSaveOrders;
+
+        private void SaveLoadOrdersThreadArea()
+        {
+            LoadOrders();
+
+            myExecureOrdersCount = _myExecuteOrders.Count;
+            myCanselOrdersCount = _myCanselOrders.Count;
+
+            while (true)
+            {
+                Thread.Sleep(500);
+
+                try
+                {
+                    
+                    if (ServerStatus == ServerConnectStatus.Disconnect)
+                    {
+                        continue;
+                    }
+
+                    if (LastStartServerTime.AddSeconds(30) >= DateTime.Now)
+                    {
+                        continue;
+                    }
+
+                    if (LastStartServerTime.AddSeconds(30) < DateTime.Now
+                        && LastStartServerTime.AddSeconds(120) > DateTime.Now)
+                    {
+                        if (_lastTimeCheckOrders == DateTime.MinValue)
+                        {
+                            _lastTimeCheckOrders = DateTime.Now;
+                            CheckOrderState();
+                            SaveOrders();
+                        }
+
+                        continue;
+                    }
+
+                    if (_myExecuteOrders.Count != myExecureOrdersCount ||
+                        _myCanselOrders.Count != myCanselOrdersCount ||
+                        _needToSaveOrders == true)
+                    {
+                        SaveOrders();
+                        myExecureOrdersCount = _myExecuteOrders.Count;
+                        myCanselOrdersCount = _myCanselOrders.Count;
+                    }
+                }
+                catch(Exception error)
+                {
+                    SendLogMessage(error.ToString(), LogMessageType.Error);
+                    Thread.Sleep(10000);
+                }
+               
+            }
+        }
+
+        private void SaveOrders()
+        {
+            SaveOpenOrders();
+            SaveCanselOrders();
+        }
+
+        private void LoadOrders()
+        {
+            LoadOpenOrders();
+            LoadCanselOrders();
+        }
+
+        private void LoadOpenOrders()
+        {
+            if (!File.Exists(@"Engine\" + ServerType + @" OpenOrders.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + ServerType + @" OpenOrders.txt"))
+                {
+                    while(reader.EndOfStream == false)
+                    {
+                        string str = reader.ReadLine();
+                        Order ord = new Order();
+                        ord.SetOrderFromString(str);
+                        _myExecuteOrders.Add(ord);
+                    }
+                    reader.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void SaveOpenOrders()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + ServerType + @" OpenOrders.txt", false))
+                {
+                    for (int i = _myExecuteOrders.Count - 1; i >= 0 && i > _myExecuteOrders.Count - 100; i--)
+                    {
+                        string saveStr = _myExecuteOrders[i].GetStringForSave().ToString();
+                        writer.WriteLine(saveStr);
+                    }
+                   
+                    writer.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void LoadCanselOrders()
+        {
+            if (!File.Exists(@"Engine\" + ServerType + @" CanselOrders.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + ServerType + @" CanselOrders.txt"))
+                {
+                    while (reader.EndOfStream == false)
+                    {
+                        string str = reader.ReadLine();
+                        Order ord = new Order();
+                        ord.SetOrderFromString(str);
+                        _myCanselOrders.Add(ord);
+                    }
+
+                    reader.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void SaveCanselOrders()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + ServerType + @" CanselOrders.txt", false))
+                {
+                    for (int i = _myCanselOrders.Count - 1; i >= 0 && i > _myCanselOrders.Count - 100; i--)
+                    {
+                        string saveStr = _myCanselOrders[i].GetStringForSave().ToString();
+                        writer.WriteLine(saveStr);
+                    }
+                    writer.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private void CheckOrderState()
+        {
+            if(_myExecuteOrders.Count != 0)
+            {
+                _serverRealization.GetOrdersState(_myExecuteOrders);
+            }
+            if(_myCanselOrders.Count != 0)
+            {
+                _serverRealization.GetOrdersState(_myCanselOrders);
+            }
+        }
 
         // log messages / сообщения для лога
 

@@ -45,7 +45,13 @@ namespace OsEngine.OsTrader.Panels
         /// clusters / 
         /// кластеры
         /// </summary>
-        Cluster
+        Cluster,
+
+        /// <summary>
+        /// screener /
+        /// скринер
+        /// </summary>
+        Screener
 
     }
 
@@ -71,6 +77,9 @@ namespace OsEngine.OsTrader.Panels
 
             _log = new Log(name, startProgram);
             _log.Listen(this);
+
+            ParamGuiSettings = new ParamGuiSettings();
+            ParamGuiSettings.LogMessageEvent += SendNewLogMessage;
         }
 
         /// <summary>
@@ -108,6 +117,20 @@ namespace OsEngine.OsTrader.Panels
                 {
                     journals.Add(((BotTabSimple)_botTabs[i]).GetJournal());
                 }
+                if (_botTabs[i].GetType().Name == "BotTabScreener")
+                {
+                    List<Journal.Journal> journalsOnTab = ((BotTabScreener)_botTabs[i]).GetJournals();
+
+                    if(journalsOnTab == null ||
+                        journalsOnTab.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    journals.AddRange(journalsOnTab);
+                }
+
+
             }
 
             return journals;
@@ -123,18 +146,27 @@ namespace OsEngine.OsTrader.Panels
             {
                 _chartUi = new BotPanelChartUi(this);
                 _chartUi.Show();
+                _chartUi.Closed += _chartUi_Closed;
             }
-            _chartUi.Closed += _chartUi_Closed;
+            else
+            {
+                _chartUi.Activate();
+            }
         }
-
 
         public BotPanelChartUi _chartUi;
 
         void _chartUi_Closed(object sender, EventArgs e)
         {
             _chartUi = null;
+
+            if (ChartClosedEvent != null)
+            {
+                ChartClosedEvent(this.NameStrategyUniq);
+            }
         }
 
+        public event Action<string> ChartClosedEvent;
 
         /// <summary>
         /// is drawing included / 
@@ -168,6 +200,11 @@ namespace OsEngine.OsTrader.Panels
 
             try
             {
+                if(_tabBotTab == null)
+                {
+                    return;
+                }
+
                 if (!_tabBotTab.Dispatcher.CheckAccess())
                 {
                     _tabBotTab.Dispatcher.Invoke(new Action<Grid,WindowsFormsHost, WindowsFormsHost, WindowsFormsHost,
@@ -376,6 +413,22 @@ namespace OsEngine.OsTrader.Panels
             }
         }
 
+        /// <summary>
+        /// сдвинуть представление чарта вправо до конца. Нужно для тестера. Сдвигается если выбрана вкладка BotTabSimple
+        /// </summary>
+        public void MoveChartToTheRight()
+        {
+            if(ActivTab == null)
+            {
+                return;
+            }
+
+            if(ActivTab.GetType().Name == "BotTabSimple")
+            {
+                ((BotTabSimple)ActivTab).MoveChartToTheRight();
+            }
+        }
+
         // robot trading figures / показатели торговли робота
 
         /// <summary>
@@ -564,20 +617,16 @@ position => position.State != PositionStateType.OpeningFail
                     return 0;
                 }
 
-                decimal winPoses = 0;
-
-                decimal allPoses = 0;
-
                 List<Position> pos = new List<Position>();
 
                 for (int i = 0; i < journals.Count; i++)
                 {
-                    if (journals[i].AllPosition == null ||
-                        journals[i].AllPosition.Count == 0)
+                    if (journals[i].OpenPositions == null ||
+                        journals[i].OpenPositions.Count == 0)
                     {
                         continue;
                     }
-                    pos.AddRange(journals[i].AllPosition);
+                    pos.AddRange(journals[i].OpenPositions);
                 }
                 return pos.Count;
             }
@@ -597,8 +646,20 @@ position => position.State != PositionStateType.OpeningFail
                 MessageBox.Show(OsLocalization.Trader.Label51);
                 return;
             }
-            _paramUi = new ParemetrsUi(_parameters);
-            _paramUi.ShowDialog();
+
+            if (_paramUi == null)
+            {
+                _paramUi = new ParemetrsUi(_parameters, ParamGuiSettings);
+                _paramUi.Show();
+                _paramUi.Closing += (a, b) =>
+                {
+                    _paramUi = null;
+                };
+            }
+            else
+            {
+                _paramUi.Activate();
+            }
         }
 
         private ParemetrsUi _paramUi;
@@ -612,6 +673,12 @@ position => position.State != PositionStateType.OpeningFail
         }
 
         /// <summary>
+        /// базовые настройки окна параметров 
+        /// Gui Settings
+        /// </summary>
+        public ParamGuiSettings ParamGuiSettings;
+
+        /// <summary>
         /// create a Decimal type parameter / 
         /// создать параметр типа Decimal
         /// </summary>
@@ -620,9 +687,10 @@ position => position.State != PositionStateType.OpeningFail
         /// <param name="start">first value / Первое значение при оптимизации</param>
         /// <param name="stop">last value / Последнее значение при оптимизации</param>
         /// <param name="step">value step / Шаг изменения при оптимизации</param>
-        public StrategyParameterDecimal CreateParameter(string name, decimal value, decimal start, decimal stop, decimal step)
+        /// <param name="tabName">name of the tab in the param window / Название вкладки в окне параметров</param>
+        public StrategyParameterDecimal CreateParameter(string name, decimal value, decimal start, decimal stop, decimal step, string tabControlName = null)
         {
-            StrategyParameterDecimal newParameter = new StrategyParameterDecimal(name, value, start, stop, step);
+            StrategyParameterDecimal newParameter = new StrategyParameterDecimal(name, value, start, stop, step, tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -641,10 +709,10 @@ position => position.State != PositionStateType.OpeningFail
         /// <param name="start">first value / Первое значение при оптимизации</param>
         /// <param name="stop">last value / Последнее значение при оптимизации</param>
         /// <param name="step">value step / Шаг изменения при оптимизации</param>
-        public StrategyParameterTimeOfDay CreateParameterTimeOfDay(string name, int hour, int minute, int second, int millisecond)
+        public StrategyParameterTimeOfDay CreateParameterTimeOfDay(string name, int hour, int minute, int second, int millisecond, string tabControlName = null)
         {
             StrategyParameterTimeOfDay newParameter =
-                new StrategyParameterTimeOfDay(name, hour, minute, second, millisecond);
+                new StrategyParameterTimeOfDay(name, hour, minute, second, millisecond, tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -663,9 +731,9 @@ position => position.State != PositionStateType.OpeningFail
         /// <param name="start">first value / Первое значение при оптимизации</param>
         /// <param name="stop">last value / Последнее значение при оптимизации</param>
         /// <param name="step">value step / Шаг изменения при оптимизации</param>
-        public StrategyParameterInt CreateParameter(string name, int value, int start, int stop, int step)
+        public StrategyParameterInt CreateParameter(string name, int value, int start, int stop, int step, string tabControlName = null)
         {
-            StrategyParameterInt newParameter = new StrategyParameterInt(name, value, start, stop, step);
+            StrategyParameterInt newParameter = new StrategyParameterInt(name, value, start, stop, step, tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -682,9 +750,9 @@ position => position.State != PositionStateType.OpeningFail
         /// <param name="name">param name / Имя параметра</param>
         /// <param name="value">default value / Значение по умолчанию</param>
         /// <param name="collection">values / Возможные значения для параметра</param>
-        public StrategyParameterString CreateParameter(string name, string value, string[] collection)
+        public StrategyParameterString CreateParameter(string name, string value, string[] collection, string tabControlName = null)
         {
-            StrategyParameterString newParameter = new StrategyParameterString(name, value, collection.ToList());
+            StrategyParameterString newParameter = new StrategyParameterString(name, value, collection.ToList(), tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -700,9 +768,9 @@ position => position.State != PositionStateType.OpeningFail
         /// </summary>
         /// <param name="name">param name / Имя параметра</param>
         /// <param name="value">default value / Значение по умолчанию</param>
-        public StrategyParameterString CreateParameter(string name, string value)
+        public StrategyParameterString CreateParameter(string name, string value, string tabControlName = null)
         {
-            StrategyParameterString newParameter = new StrategyParameterString(name, value);
+            StrategyParameterString newParameter = new StrategyParameterString(name, value, tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -718,9 +786,9 @@ position => position.State != PositionStateType.OpeningFail
         /// </summary>
         /// <param name="name">param name / Имя параметра</param>
         /// <param name="value">default value / Значение по умолчанию</param>
-        public StrategyParameterBool CreateParameter(string name, bool value)
+        public StrategyParameterBool CreateParameter(string name, bool value, string tabControlName = null)
         {
-            StrategyParameterBool newParameter = new StrategyParameterBool(name, value);
+            StrategyParameterBool newParameter = new StrategyParameterBool(name, value, tabControlName);
 
             if (_parameters.Find(p => p.Name == name) != null)
             {
@@ -734,9 +802,9 @@ position => position.State != PositionStateType.OpeningFail
         /// create button type parameter / 
         /// создать параметр типа Button
         /// </summary>
-        public StrategyParameterButton CreateParameterButton(string buttonLabel)
+        public StrategyParameterButton CreateParameterButton(string buttonLabel, string tabControlName = null)
         {
-            StrategyParameterButton newParameter = new StrategyParameterButton(buttonLabel);
+            StrategyParameterButton newParameter = new StrategyParameterButton(buttonLabel, tabControlName);
 
             if (_parameters.Find(p => p.Name == buttonLabel) != null)
             {
@@ -744,6 +812,18 @@ position => position.State != PositionStateType.OpeningFail
             }
 
             return (StrategyParameterButton)LoadParameterValues(newParameter);
+        }
+
+        public StrategyParameterLabel CreateParameterLabel(string name, string label, string value, int rowHeight,  int textHeight, System.Drawing.Color color, string tabControlName = null)
+        {
+            StrategyParameterLabel newParameter = new StrategyParameterLabel(name, label, value, rowHeight, textHeight, color, tabControlName);
+
+            if (_parameters.Find(p => p.Name == name) != null)
+            {
+                throw new Exception(OsLocalization.Trader.Label52);
+            }
+
+            return (StrategyParameterLabel)LoadParameterValues(newParameter);
         }
 
         /// <summary>
@@ -1003,27 +1083,11 @@ position => position.State != PositionStateType.OpeningFail
         {
             get
             {
-                try
-                {
-                    List<BotTabSimple> tabSimples = new List<BotTabSimple>();
-
-                    for (int i = 0; _botTabs != null && i < _botTabs.Count; i++)
-                    {
-                        if (_botTabs[i].GetType().Name == "BotTabSimple")
-                        {
-                            tabSimples.Add((BotTabSimple)_botTabs[i]);
-                        }
-                    }
-
-                    return tabSimples;
-                }
-                catch (Exception error)
-                {
-                    SendNewLogMessage(error.ToString(), LogMessageType.Error);
-                }
-                return null;
+                return _tabSimple;
             }
         }
+
+        private List<BotTabSimple> _tabSimple = new List<BotTabSimple>();
 
         /// <summary>
         /// index tabs
@@ -1033,27 +1097,10 @@ position => position.State != PositionStateType.OpeningFail
         {
             get
             {
-                try
-                {
-                    List<BotTabIndex> tabSpreads = new List<BotTabIndex>();
-
-                    for (int i = 0; _botTabs != null && i < _botTabs.Count; i++)
-                    {
-                        if (_botTabs[i].GetType().Name == "BotTabIndex")
-                        {
-                            tabSpreads.Add((BotTabIndex)_botTabs[i]);
-                        }
-                    }
-
-                    return tabSpreads;
-                }
-                catch (Exception error)
-                {
-                    SendNewLogMessage(error.ToString(), LogMessageType.Error);
-                }
-                return null;
+                return _tabIndex;
             }
         }
+        private List<BotTabIndex> _tabIndex = new List<BotTabIndex>();
 
         /// <summary>
         /// clustered tabs / 
@@ -1063,27 +1110,25 @@ position => position.State != PositionStateType.OpeningFail
         {
             get
             {
-                try
-                {
-                    List<BotTabCluster> tabSpreads = new List<BotTabCluster>();
-
-                    for (int i = 0; _botTabs != null && i < _botTabs.Count; i++)
-                    {
-                        if (_botTabs[i].GetType().Name == "BotTabCluster")
-                        {
-                            tabSpreads.Add((BotTabCluster)_botTabs[i]);
-                        }
-                    }
-
-                    return tabSpreads;
-                }
-                catch (Exception error)
-                {
-                    SendNewLogMessage(error.ToString(), LogMessageType.Error);
-                }
-                return null;
+                return _tabCluster;
             }
         }
+
+        private List<BotTabCluster> _tabCluster = new List<BotTabCluster>();
+
+        /// <summary>
+        /// Screener tabs / 
+        /// вкладки со скринерами
+        /// </summary>
+        public List<BotTabScreener> TabsScreener
+        {
+            get
+            {
+                return _tabScreener;
+            }
+        }
+
+        private List<BotTabScreener> _tabScreener = new List<BotTabScreener>();
 
         /// <summary>
         /// user toggled tabs / 
@@ -1097,6 +1142,7 @@ position => position.State != PositionStateType.OpeningFail
                 {
                     ChangeActivTab(_tabBotTab.SelectedIndex);
                 }
+                
             }
             catch (Exception error)
             {
@@ -1139,14 +1185,30 @@ position => position.State != PositionStateType.OpeningFail
                 if (tabType == BotTabType.Simple)
                 {
                     newTab = new BotTabSimple(nameTab, StartProgram);
+                    _tabSimple.Add((BotTabSimple)newTab);
                 }
                 else if (tabType == BotTabType.Index)
                 {
                     newTab = new BotTabIndex(nameTab, StartProgram);
+                    _tabIndex.Add((BotTabIndex)newTab);
                 }
                 else if (tabType == BotTabType.Cluster)
                 {
                     newTab = new BotTabCluster(nameTab, StartProgram);
+                    _tabCluster.Add((BotTabCluster)newTab);
+                }
+                else if (tabType == BotTabType.Screener)
+                {
+                    newTab = new BotTabScreener(nameTab, StartProgram);
+                    _tabScreener.Add((BotTabScreener)newTab);
+
+                    ((BotTabScreener)newTab).NewTabCreateEvent += (tab) =>
+                    {
+                        if (NewTabCreateEvent != null)
+                        {
+                            NewTabCreateEvent();
+                        }
+                    };
                 }
                 else
                 {
@@ -1161,6 +1223,11 @@ position => position.State != PositionStateType.OpeningFail
                 ChangeActivTab(_botTabs.Count - 1);
 
                 ReloadTab();
+
+                if (NewTabCreateEvent != null)
+                {
+                    NewTabCreateEvent();
+                }
             }
             catch (Exception error)
             {
@@ -1189,6 +1256,11 @@ position => position.State != PositionStateType.OpeningFail
                 }
 
                 ReloadTab();
+
+                if (NewTabCreateEvent != null)
+                {
+                    NewTabCreateEvent();
+                }
             }
             catch (Exception error)
             {
@@ -1223,6 +1295,11 @@ position => position.State != PositionStateType.OpeningFail
                 }
 
                 ReloadTab();
+
+                if (NewTabCreateEvent != null)
+                {
+                    NewTabCreateEvent();
+                }
             }
             catch (Exception error)
             {
@@ -1248,6 +1325,12 @@ position => position.State != PositionStateType.OpeningFail
                     _tabBotTab.Dispatcher.Invoke(new Action<int>(ChangeActivTab), tabNumber);
                     return;
                 }
+
+                if(_tabBotTab.IsVisible == false)
+                {
+
+                }
+
                 if (ActivTab != null)
                 {
                     ActivTab.StopPaint();
@@ -1273,6 +1356,10 @@ position => position.State != PositionStateType.OpeningFail
                 else if (ActivTab.GetType().Name == "BotTabCluster")
                 {
                     ((BotTabCluster)ActivTab).StartPaint(_hostChart, _rectangle);
+                }
+                else if (ActivTab.GetType().Name == "BotTabScreener")
+                {
+                    ((BotTabScreener)ActivTab).StartPaint(_hostChart);
                 }
             }
             catch (Exception error)
@@ -1356,6 +1443,10 @@ position => position.State != PositionStateType.OpeningFail
             {
                 TabsCluster[i].Clear();
             }
+            for (int i = 0; TabsScreener != null && i < TabsScreener.Count; i++)
+            {
+                TabsScreener[i].Clear();
+            }
 
             if (_botTabs != null)
             {
@@ -1363,6 +1454,11 @@ position => position.State != PositionStateType.OpeningFail
             }
 
             ActivTab = null;
+
+            if(NewTabCreateEvent != null)
+            {
+                NewTabCreateEvent();
+            }
         }
 
         // call control windows / вызыв окон управления
@@ -1431,6 +1527,144 @@ position => position.State != PositionStateType.OpeningFail
         /// </summary>
         public event Action DeleteEvent;
 
+        /// <summary>
+        /// sourse count change
+        /// изменилось кол-во источников
+        /// </summary>
+        public event Action NewTabCreateEvent;
+
+    }
+
+    /// <summary>
+    /// базовые настройки окна параметров 
+    /// Gui Settings
+    /// </summary>
+    public class ParamGuiSettings
+    {
+        /// <summary>
+        /// подпись для окна параметров
+        /// </summary>
+        public string Title;
+
+        /// <summary>
+        /// название вкладки по умолчанию
+        /// </summary>
+        public string FirstTabLabel = "Prime";
+
+        /// <summary>
+        /// стартовая высота окна параметров
+        /// </summary>
+        public decimal Height = 370;
+
+        /// <summary>
+        /// стартовая ширина окна параметров
+        /// </summary>
+        public decimal Width = 600;
+
+        /// <summary>
+        /// пользовательские вкладки 
+        /// </summary>
+        public List<CustomTabToParametersUi> CustomTabs = new List<CustomTabToParametersUi>();
+
+        /// <summary>
+        /// создать вкладку для окна параметров
+        /// </summary>
+        /// <param name="tabLabel">имя вкладки</param>
+        /// <returns></returns>
+        public CustomTabToParametersUi CreateCustomTab(string tabLabel)
+        {
+            CustomTabToParametersUi newTab = CustomTabs.Find(tab => tab.Label == tabLabel);
+
+            if(newTab != null)
+            {
+                SendNewLogMessage
+                    ("An attempt was intercepted to create a second tab of parameters with the same name that is already in the collection.",
+                    LogMessageType.Error);
+                return newTab;
+            }
+
+            newTab = new CustomTabToParametersUi(tabLabel);
+
+            CustomTabs.Add(newTab);
+
+            return newTab;
+        }
+
+        /// <summary>
+        /// send new message / 
+        /// выслать новое сообщение на верх
+        /// </summary>
+        protected void SendNewLogMessage(string message, LogMessageType type)
+        {
+            if (LogMessageEvent != null)
+            {
+                LogMessageEvent(message, type);
+            }
+            else if (type == LogMessageType.Error)
+            {
+                System.Windows.MessageBox.Show(message);
+            }
+        }
+
+        /// <summary>
+        /// log message event
+        /// исходящее сообщение для лога
+        /// </summary>
+        public event Action<string, LogMessageType> LogMessageEvent;
+    }
+
+    public class CustomTabToParametersUi
+    {
+        public CustomTabToParametersUi(string label)
+        {
+            _label = label;
+
+            CreateGrid();
+        }
+
+        public void CreateGrid()
+        {
+            if (MainWindow.GetDispatcher.CheckAccess() == false)
+            {
+                MainWindow.GetDispatcher.Invoke(new Action(CreateGrid));
+                return;
+            }
+
+            GridToPaint = new System.Windows.Controls.Grid();
+        }
+
+        private CustomTabToParametersUi()
+        {
+
+        }
+
+        /// <summary>
+        /// название вкладки
+        /// </summary>
+        public string Label
+        {
+            get
+            {
+                return _label;
+            }
+        }
+        private string _label;
+
+        /// <summary>
+        /// Элемент который нужно разместить на вкладке
+        /// </summary>
+        public System.Windows.Controls.Grid GridToPaint;
+
+        public void AddChildren(object children)
+        {
+            if(GridToPaint.Dispatcher.CheckAccess() == false)
+            {
+                GridToPaint.Dispatcher.Invoke(new Action<object>(AddChildren), children);
+                return;
+            }
+
+            GridToPaint.Children.Add((UIElement)children);
+        }
     }
 
     /// <summary>
