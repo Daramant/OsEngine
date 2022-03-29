@@ -10,7 +10,6 @@ using System.Windows.Shapes;
 using OsEngine.Charts.ClusterChart;
 using OsEngine.Entity;
 using OsEngine.Logging;
-using OsEngine.Market;
 using OsEngine.Market.Connectors;
 using Chart = System.Windows.Forms.DataVisualization.Charting.Chart;
 
@@ -254,7 +253,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         private void Tab_LastCandlesChangeEvent(List<Candle> candles)
         {
-            LastTimeCandleUpdate = DateTime.Now;
+            LastTimeCandleUpdate = CandleConnector.MarketTime;
             _horizontalVolume.Process(candles);
             _chartMaster.Process(_horizontalVolume);
         }

@@ -71,6 +71,10 @@ namespace OsEngine.Language
             "Eng:Short_" +
             "Ru:Шорт_");
 
+        public string Label4 => OsLocalization.ConvertToLocString(
+            "Eng:Volume Assemblage_" +
+            "Ru:Ассемблирование объёма_");
+
         public string TabItem1 => OsLocalization.ConvertToLocString(
             "Eng:Equity_" +
             "Ru:Эквити_");
@@ -128,19 +132,19 @@ namespace OsEngine.Language
             "Ru:Recovery_");
 
         public string GridRow6 => OsLocalization.ConvertToLocString(
-            "Eng:Meadle P\\L one pos_" +
+            "Eng:Average P\\L one pos_" +
             "Ru:Сред. П\\У   движение_");
 
         public string GridRow7 => OsLocalization.ConvertToLocString(
-            "Eng:Meadle P\\L one pos %_" +
+            "Eng:Average P\\L one pos %_" +
             "Ru:Сред. П\\У движение %_");
 
         public string GridRow8 => OsLocalization.ConvertToLocString(
-            "Eng:Meadle P\\L portfolio_" +
+            "Eng:Average P\\L portfolio_" +
             "Ru:Сред. П\\У    капитал_");
 
         public string GridRow9 => OsLocalization.ConvertToLocString(
-            "Eng:Meadle P\\L portfolio %_" +
+            "Eng:Average P\\L portfolio %_" +
             "Ru:Сред. П\\У капитал %_");
 
         public string GridRow10 => OsLocalization.ConvertToLocString(
@@ -178,5 +182,6 @@ namespace OsEngine.Language
         public string Message2 => OsLocalization.ConvertToLocString(
             "Eng:You must select a file to load!_" +
             "Ru:Необходимо выбрать файл для загрузки!_");
+
     }
 }

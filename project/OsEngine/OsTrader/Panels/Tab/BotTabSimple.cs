@@ -72,8 +72,9 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 _chartMaster = new ChartCandleMaster(TabName, StartProgram);
                 _chartMaster.LogMessageEvent += SetNewLogMessage;
-                _chartMaster.SetNewSecurity(_connector.NamePaper, _connector.TimeFrameBuilder, _connector.PortfolioName, _connector.ServerType);
+                _chartMaster.SetNewSecurity(_connector.SecurityName, _connector.TimeFrameBuilder, _connector.PortfolioName, _connector.ServerType);
                 _chartMaster.SetPosition(_journal.AllPosition);
+                _chartMaster.IndicatorUpdateEvent += _chartMaster_IndicatorUpdateEvent;
 
                 if (StartProgram != StartProgram.IsOsOptimizer)
                 {
@@ -111,6 +112,10 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="serverType">server type / тип сервера у коннектора</param>
         void _connector_ConnectorStartedReconnectEvent(string securityName, TimeFrame timeFrame, TimeSpan timeFrameSpan, string portfolioName, ServerType serverType)
         {
+            if(_chartMaster == null)
+            {
+                return;
+            }
             _chartMaster.ClearTimePoints();
             if (string.IsNullOrEmpty(securityName))
             {
@@ -387,6 +392,14 @@ namespace OsEngine.OsTrader.Panels.Tab
             return _chartMaster.GetChartLabel();
         }
 
+        /// <summary>
+        /// сдвинуть представление чарта вправо до конца
+        /// </summary>
+        public void MoveChartToTheRight()
+        {
+            _chartMaster.MoveChartToTheRight();
+        }
+
         // closed components / закрытые составные части
 
         /// <summary>
@@ -442,7 +455,14 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// alerts wizard /
         /// мастер Алертов
         /// </summary>
-        private AlertMaster _alerts;
+        public AlertMaster _alerts;
+
+        public event Action AlertSignalEvent;
+
+        public ChartCandleMaster GetChartMaster()
+        {
+            return _chartMaster;
+        }
 
         // properties / свойства 
 
@@ -479,7 +499,7 @@ namespace OsEngine.OsTrader.Panels.Tab
             get
             {
                 if (_security == null ||
-                    _security.Name != _connector.NamePaper)
+                    _security.Name != _connector.SecurityName)
                 {
                     _security = _connector.Security;
                 }
@@ -1131,6 +1151,16 @@ namespace OsEngine.OsTrader.Panels.Tab
             _chartMaster.GoChartToTime(time);
         }
 
+        /// <summary>
+        /// взять контекстное меню настройки чарта и индикаторов
+        /// </summary>
+        /// <returns></returns>
+        public System.Windows.Forms.ContextMenu GetContextDialog()
+        {
+            return _chartMaster.GetContextMenu();
+        }
+
+
         // standard public functions for position management
         // стандартные публичные функции для управления позицией
 
@@ -1142,7 +1172,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                 _connector.ServerType == ServerType.FTX ||
                 _connector.ServerType == ServerType.BinanceFutures ||
                 _connector.ServerType == ServerType.Transaq ||
-                _connector.ServerType == ServerType.Tester
+                _connector.ServerType == ServerType.Tester ||
+                _connector.ServerType == ServerType.BitMex
                 )
             {
                 return true;
@@ -2974,7 +3005,16 @@ namespace OsEngine.OsTrader.Panels.Tab
                 }
 
                 position.StopOrderIsActiv = false;
-                position.StopOrderPrice = priceOrder;
+
+                if (StartProgram == StartProgram.IsOsOptimizer ||
+                    StartProgram == StartProgram.IsTester)
+                {
+                    position.StopOrderPrice = priceActivate;
+                }
+                else
+                {
+                    position.StopOrderPrice = priceOrder;
+                }
                 position.StopOrderRedLine = priceActivate;
                 position.StopOrderIsActiv = true;
 
@@ -3027,7 +3067,17 @@ namespace OsEngine.OsTrader.Panels.Tab
 
 
                 position.ProfitOrderIsActiv = false;
-                position.ProfitOrderPrice = priceOrder;
+
+                if (StartProgram == StartProgram.IsOsOptimizer ||
+                    StartProgram == StartProgram.IsTester)
+                {
+                    position.ProfitOrderPrice = priceActivate;
+                }
+                else
+                {
+                    position.ProfitOrderPrice = priceOrder;
+                }
+
                 position.ProfitOrderRedLine = priceActivate;
                 position.ProfitOrderIsActiv = true;
 
@@ -3273,6 +3323,11 @@ namespace OsEngine.OsTrader.Panels.Tab
                 if (signal == null)
                 {
                     return;
+                }
+
+                if(AlertSignalEvent != null)
+                {
+                    AlertSignalEvent();
                 }
 
                 if (signal.SignalType == SignalType.CloseAll)
@@ -3658,7 +3713,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                 MarketDepthUpdateEvent(marketDepth);
             }
 
-            if (StartProgram != StartProgram.IsOsTrader)
+            if (StartProgram != StartProgram.IsOsTrader )
             {
                 if (marketDepth.Asks == null || marketDepth.Asks.Count == 0 ||
                     marketDepth.Bids == null || marketDepth.Bids.Count == 0)
@@ -3676,13 +3731,13 @@ namespace OsEngine.OsTrader.Panels.Tab
                         {
                             continue;
                         }
-                        // CheckStop(openPositions[i], marketDepth.Asks[0].Price);
+                         CheckStop(openPositions[i], marketDepth.Asks[0].Price);
 
                         if (openPositions.Count <= i)
                         {
                             continue;
                         }
-                        //CheckStop(openPositions[i], marketDepth.Bids[0].Price);
+                        CheckStop(openPositions[i], marketDepth.Bids[0].Price);
                     }
                 }
             }
@@ -3861,7 +3916,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             try
             {
-                LastTimeCandleUpdate = DateTime.Now;
+                LastTimeCandleUpdate = Connector.MarketTime;
 
                 AlertControlPosition();
 
@@ -4142,6 +4197,17 @@ namespace OsEngine.OsTrader.Panels.Tab
             BestBidAskChangeEvent?.Invoke(bestBid, bestAsk);
         }
 
+        /// <summary>
+        /// изменились параметры индикатора
+        /// </summary>
+        private void _chartMaster_IndicatorUpdateEvent()
+        {
+            if (IndicatorUpdateEvent != null)
+            {
+                IndicatorUpdateEvent();
+            }
+        }
+
         // исходящие события. Обработчики для стратегии
         // outgoing events. Handlers for strategy
 
@@ -4259,6 +4325,10 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// </summary>
         public event Action<Order> OrderUpdateEvent;
 
+        /// <summary>
+        /// изменились параметры индикатора
+        /// </summary>
+        public event Action IndicatorUpdateEvent;
     }
 
 

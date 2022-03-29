@@ -214,16 +214,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 endTimeStep = endTimeStep + new TimeSpan(0, 0, interval, 0);
 
-                if (endTimeStep > DateTime.Now - new TimeSpan(0, 0, (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes, 0))
-                    endTimeStep = DateTime.Now - new TimeSpan(0, 0, (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes, 0);
+                DateTime realEndTime = endTimeStep;
 
-                List<Candle> stepCandles = _client.GetCandlesForTimes(security.Name, timeFrameBuilder.TimeFrameTimeSpan, startTimeStep, endTimeStep);
+                if (realEndTime > DateTime.Now - new TimeSpan(0, 0, (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes, 0))
+                    realEndTime = DateTime.Now - new TimeSpan(0, 0, (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes, 0);
+
+                List<Candle> stepCandles = _client.GetCandlesForTimes(security.Name, timeFrameBuilder.TimeFrameTimeSpan, startTimeStep, realEndTime);
 
                 if (stepCandles != null)
                     candles.AddRange(stepCandles);
 
 
                 startTimeStep = endTimeStep + new TimeSpan(0, 0, (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes, 0);
+
+                if (endTime < endTimeStep)
+                {
+                    break;
+                }
 
                 Thread.Sleep(300);
             }
@@ -235,7 +242,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
             return candles;
         }
-
 
         /// <summary>
         /// take ticks data on instrument for period
@@ -290,7 +296,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
             return trades;
         }
 
-
         /// <summary>
         /// request order state
         /// запросить статус ордеров
@@ -314,7 +319,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// статус серверов
         /// </summary>
         public ServerConnectStatus ServerStatus { get; set; }
-
 
         /// <summary>
         /// get realtime Mark Price and Funding Rate
@@ -532,6 +536,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         onePortf.wb.ToDecimal();
                 }
 
+                bool allPosesIsNull = true;
+
                 foreach (var onePortf in portfs.a.P)
                 {
                     if (onePortf == null ||
@@ -540,6 +546,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     {
                         continue;
                     }
+
+                    if(onePortf.ep.ToDecimal() == 0)
+                    {
+                        continue;
+                    }
+
+                    allPosesIsNull = false;
 
                     PositionOnBoard neeedPortf =
                         portfolio.GetPositionOnBoard().Find(p => p.SecurityNameCode == onePortf.s);
@@ -557,6 +570,36 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                     neeedPortf.ValueCurrent =
                         onePortf.pa.ToDecimal();
+                }
+
+                if(allPosesIsNull == true)
+                {
+                    foreach (var onePortf in portfs.a.P)
+                    {
+                        if (onePortf == null ||
+                            onePortf.s == null ||
+                            onePortf.pa == null)
+                        {
+                            continue;
+                        }
+
+                        PositionOnBoard neeedPortf =
+                            portfolio.GetPositionOnBoard().Find(p => p.SecurityNameCode == onePortf.s);
+
+                        if (neeedPortf == null)
+                        {
+                            PositionOnBoard newPositionOnBoard = new PositionOnBoard();
+                            newPositionOnBoard.SecurityNameCode = onePortf.s;
+                            newPositionOnBoard.PortfolioName = portfolio.Number;
+                            newPositionOnBoard.ValueBegin = 0;
+                            portfolio.SetNewPosition(newPositionOnBoard);
+                            neeedPortf = newPositionOnBoard;
+                        }
+
+                        neeedPortf.ValueCurrent = 0;
+                        break;
+                    }
+
                 }
 
                 if (PortfolioEvent != null)
@@ -659,15 +702,104 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     security.Decimals = 0;
                 }
 
+                if (sec.filters.Count > 1 &&
+                    sec.filters[2] != null &&
+                    sec.filters[2].minQty != null)
+                {
+                    decimal minQty = sec.filters[2].minQty.ToDecimal();
+                    string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
+                    if (qtyInStr.Split('.').Length > 1)
+                    {
+                        security.DecimalsVolume = qtyInStr.Split('.')[1].Length;
+                    }
+                }
+
                 security.State = SecurityStateType.Activ;
                 _securities.Add(security);
             }
+
+            List<Security> secNonPerp = new List<Security>();
+
+            for(int i = 0;i < _securities.Count;i++)
+            {
+                string[] str = _securities[i].Name.Split('_');
+
+                if (str.Length > 1 &&
+                    str[1] != "PERP")
+                {
+                    secNonPerp.Add(_securities[i]);
+                }
+
+            }
+
+            List<Security> securitiesHistorical = CreateHistoricalSecurities(secNonPerp);
+
+            _securities.AddRange(securitiesHistorical);
 
             if (SecurityEvent != null)
             {
                 SecurityEvent(_securities);
             }
         }
+
+        private List<Security> CreateHistoricalSecurities(List<Security> securities)
+        {
+            List<Security> secHistorical = new List<Security>();
+
+            for(int i = 0;i < securities.Count;i++)
+            {
+                if(secHistorical.Find(s => s.Name.Split('_')[0] == securities[i].Name.Split('_')[0]) != null)
+                {
+                    continue;
+                }
+
+                secHistorical.AddRange(GetHistoricalSecBySec(securities[i]));
+            }
+
+            return secHistorical;
+        }
+
+        private List<Security> GetHistoricalSecBySec(Security sec)
+        {
+            List<Security> secHistorical = new List<Security>();
+
+            string name = sec.Name.Split('_')[0];
+
+            secHistorical.Add(GetHistoryOneSecurity(name + "_201225", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_210326", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_210625", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_210924", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_211231", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_220325", sec));
+            secHistorical.Add(GetHistoryOneSecurity(name + "_220624", sec));
+
+            return secHistorical;
+        }
+
+        private Security GetHistoryOneSecurity(string secName, Security sec)
+        {
+            Security security = new Security();
+            security.Name = secName;
+            security.NameFull = secName;
+            security.NameClass = "FutHistory";
+            security.NameId = secName;
+            security.SecurityType = SecurityType.Futures;
+            security.Lot = sec.Lot;
+            security.PriceStep = sec.PriceStep;
+            security.PriceStepCost = sec.PriceStepCost;
+
+            security.PriceLimitLow = sec.PriceLimitLow;
+            security.PriceLimitHigh = sec.PriceLimitHigh;
+
+            security.Decimals = sec.Decimals;
+            security.DecimalsVolume = sec.DecimalsVolume;
+               
+            security.State = SecurityStateType.Activ;
+
+            return security;
+        }
+
+
 
         void _client_Connected()
         {

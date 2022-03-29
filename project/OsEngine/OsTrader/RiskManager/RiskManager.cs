@@ -102,11 +102,14 @@ namespace OsEngine.OsTrader.RiskManager
             MaxDrowDownToDayPersent = 1;
             Load();
 
-            if (Watcher == null)
+            if(_startProgram != StartProgram.IsOsOptimizer)
             {
-                Activate();
+                if (Watcher == null)
+                {
+                    Activate();
+                }
+                RiskManagersToCheck.Add(this);
             }
-            RiskManagersToCheck.Add(this);
         }
 
         /// <summary>
@@ -155,17 +158,6 @@ namespace OsEngine.OsTrader.RiskManager
         {
             try
             {
-                if (_journals != null)
-                {
-                    for (int i = 0; i < _journals.Count; i++)
-                    {
-                        if (_journals[i].Name == newJournal.Name)
-                        {
-                            return;
-                        }
-                    }
-                }
-
                 if (_journals == null)
                 {
                     _journals = new List<Journal.Journal>();
@@ -247,7 +239,11 @@ namespace OsEngine.OsTrader.RiskManager
                     File.Delete(@"Engine\" + _name + @".txt");
                 }
 
-                RiskManagersToCheck.Remove(this);
+                if (_startProgram != StartProgram.IsOsOptimizer)
+                {
+                    RiskManagersToCheck.Remove(this);
+                }
+
                 ClearJournals();
             }
             catch (Exception error)
