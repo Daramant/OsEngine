@@ -428,18 +428,18 @@ namespace OsEngine.OsData
             NewSecurityUi ui = new NewSecurityUi(securities);
             ui.ShowDialog();
 
-            if (ui.SelectedSecurity != null && ui.SelectedSecurity.Count != 0)
+            if (ui.SelectedSecurities != null && ui.SelectedSecurities.Count != 0)
             {
                 if (SecuritiesNames == null)
                 {
                     SecuritiesNames = new List<SecurityToLoad>();
                 }
-                for (int i = 0; i < ui.SelectedSecurity.Count; i++)
+                for (int i = 0; i < ui.SelectedSecurities.Count; i++)
                 {
                     SecurityToLoad record = new SecurityToLoad();
-                    record.Name = ui.SelectedSecurity[i].Name;
-                    record.Id = ui.SelectedSecurity[i].NameId;
-                    record.Class = ui.SelectedSecurity[i].NameClass;
+                    record.Name = ui.SelectedSecurities[i].Name;
+                    record.Id = ui.SelectedSecurities[i].NameId;
+                    record.Class = ui.SelectedSecurities[i].NameClass;
 
                     if (SecuritiesNames.Find(s => s.Id == record.Id) == null)
                     {

@@ -20,10 +20,10 @@ namespace OsEngine.Market.Servers.SmartCom
             InitializeComponent();
             _server = server;
 
-            TextBoxServerAdress.Text = _server.ServerAdress;
-            TextBoxServerPort.Text = _server.ServerPort;
-            TextBoxUserName.Text = _server.UserLogin;
-            TextBoxUserPassword.Password = _server.UserPassword;
+            //TextBoxServerAdress.Text = _server.ServerAdress;
+            //TextBoxServerPort.Text = _server.ServerPort;
+            //TextBoxUserName.Text = _server.UserLogin;
+            //TextBoxUserPassword.Password = _server.UserPassword;
 
             LabelStatus.Content = _server.ServerStatus;
             _server.ConnectStatusChangeEvent += _server_ConnectStatusChangeEvent;
@@ -55,12 +55,12 @@ namespace OsEngine.Market.Servers.SmartCom
 
         private void ButtonConnect_Click(object sender, RoutedEventArgs e)
         {
-            _server.ServerAdress = TextBoxServerAdress.Text;
-            _server.ServerPort = TextBoxServerPort.Text;
-            _server.UserLogin = TextBoxUserName.Text;
-            _server.UserPassword = TextBoxUserPassword.Password;
-            _server.Save();
-            _server.StartServer();
+            //_server.ServerAdress = TextBoxServerAdress.Text;
+            //_server.ServerPort = TextBoxServerPort.Text;
+            //_server.UserLogin = TextBoxUserName.Text;
+            //_server.UserPassword = TextBoxUserPassword.Password;
+            //_server.Save();
+            //_server.StartServer();
         }
 
         private void ButtonAbort_Click(object sender, RoutedEventArgs e)

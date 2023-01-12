@@ -38,7 +38,7 @@ namespace OsEngine.OsData
         /// <summary>
         /// selected paper/выбранная бумага
         /// </summary>
-        public Security SelectedSecurity { get; private set; }
+        public List<Security> SelectedSecurities { get; private set; } = new List<Security>();
 
         /// <summary>
         /// constructor/конструктор
@@ -313,11 +313,14 @@ namespace OsEngine.OsData
                 return;
             }
 
-            SelectedSecurity = _grid.SelectedRows[0].Tag as Security;
-
-            if (SelectedSecurity == null)
+            foreach (DataGridViewRow seletedRow in _grid.SelectedRows)
             {
-                return;
+                var selectedSecurity = seletedRow.Tag as Security;
+
+                if (selectedSecurity != null)
+                {
+                    SelectedSecurities.Add(selectedSecurity);
+                }
             }
 
             Close();
