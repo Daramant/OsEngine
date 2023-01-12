@@ -60,6 +60,29 @@ namespace OsEngine.Entity
             {
                 CreateCustomTab(settings.CustomTabs[i]);
             }
+
+            this.Closed += ParemetrsUi_Closed;
+
+            this.Activate();
+            this.Focus();
+        }
+
+        private void ParemetrsUi_Closed(object sender, EventArgs e)
+        {
+            this.Closed -= ParemetrsUi_Closed;
+            _parameters = null;
+
+            if(_tabs != null)
+            {
+                for (int i = 0;i < _tabs.Count; i++)
+                {
+                    _tabs[i].Dispose();
+                }
+                _tabs.Clear();
+                _tabs = null;
+            }
+
+
         }
 
         List<List<IIStrategyParameter>> GetParamSortedByTabName()
@@ -142,6 +165,34 @@ namespace OsEngine.Entity
             PaintTable();
         }
 
+        public void Dispose()
+        {
+            if(_grid != null 
+                && _grid.InvokeRequired)
+            {
+                _grid.Invoke(new Action(Dispose));
+                return;
+            }
+
+             _parameters = null;
+
+            if(_host != null)
+            {
+                _host.Child = null;
+                _host = null;
+            }
+
+            if(_grid != null)
+            {
+                _grid.CellValueChanged -= _grid_CellValueChanged;
+                _grid.CellClick -= _grid_Click;
+                _grid.Rows.Clear();
+                DataGridFactory.ClearLinks(_grid);
+                _grid = null;
+            }
+
+        }
+
         List<IIStrategyParameter> _parameters;
 
         private WindowsFormsHost _host;
@@ -217,7 +268,8 @@ namespace OsEngine.Entity
                         cell.Value = param.ValueString;
                         row.Cells.Add(cell);
                     }
-                    else if (param.ValuesString.Count == 1)
+                    else if (param.ValuesString.Count == 1
+                        || (param.ValuesString.Count == 0 && param.ValueString != null))
                     {
                         DataGridViewTextBoxCell cell = new DataGridViewTextBoxCell();
                         cell.Value = param.ValueString;

@@ -8,6 +8,7 @@ using System.ComponentModel;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Market;
+using OsEngine.Layout;
 
 namespace OsEngine.OsTrader.Gui
 {
@@ -31,20 +32,24 @@ namespace OsEngine.OsTrader.Gui
             Closing += TesterUi_Closing;
             Local();
 
-            BotTabsPainter painter = new BotTabsPainter(_strategyKeeper, BotsHost);
+            _painter = new BotTabsPainter(_strategyKeeper, BotsHost);
 
-            ServerMasterPainter painterServer = new ServerMasterPainter(HostServers, HostServerLog, CheckBoxServerAutoOpen);
+            _painterServer = new ServerMasterPainter(HostServers, HostServerLog, CheckBoxServerAutoOpen);
 
-            Closing += delegate (object sender, CancelEventArgs args)
-            {
-                painterServer.Dispose();
-                painter = null;
-            };
+            this.Activate();
+            this.Focus();
+
+            GlobalGUILayout.Listen(this, "botStationLightUi");
         }
+
+        ServerMasterPainter _painterServer;
+
+        BotTabsPainter _painter;
 
         private void Local()
         {
-            TabItemAllPos.Header = OsLocalization.Trader.Label20;
+            Title = Title + " " + OsEngine.PrimeSettings.PrimeSettingsMaster.LabelInHeaderBotStation;
+            TabItemAllPos.Header = OsLocalization.Trader.Label20 ;
             TextBoxPositionBord.Header = OsLocalization.Trader.Label21;
             TextBoxPositionAllOrders.Header = OsLocalization.Trader.Label22;
             TabItemLogPrime.Header = OsLocalization.Trader.Label24;
@@ -60,7 +65,11 @@ namespace OsEngine.OsTrader.Gui
             if (ui.UserAcceptActioin == false)
             {
                 e.Cancel = true;
+                return;
             }
+
+            _painterServer.Dispose();
+            _painter = null;
         }
 
         private OsTraderMaster _strategyKeeper;

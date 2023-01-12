@@ -171,8 +171,9 @@ namespace OsEngine.Journal.Internal
                         positions[i].SetDealFromString(deal);
                         UpdeteOpenPositionArray(positions[i]);
                     }
-                    catch (Exception)
+                    catch (Exception error)
                     {
+                        SendNewLogMessage("ERROR on loading position " + error.ToString(), LogMessageType.Error);
                         positions.Remove(positions[i]);
                         i--;
                     }
@@ -204,6 +205,11 @@ namespace OsEngine.Journal.Internal
         {
             try
             {
+                if(_startProgram == StartProgram.IsOsOptimizer)
+                {
+                    return;
+                }
+
                 _neadToSave = false;
                 string dealControllerPath = @"Engine\" + _name + @"DealController.txt";
                 if (File.Exists(dealControllerPath))
@@ -250,7 +256,7 @@ namespace OsEngine.Journal.Internal
             {
                 List<Position> deals = _deals;
 
-                _deals = null;
+                _deals = new List<Position>();
 
                 for (int i = 0; deals != null && i < deals.Count; i++)
                 {
@@ -378,6 +384,27 @@ namespace OsEngine.Journal.Internal
         public void Save()
         {
             _neadToSave = true;
+        }
+
+        public void NeadToUpdateStatePositions()
+        {
+            for(int i = 0;i < _deals.Count;i++)
+            {
+                if(_deals[i] == null)
+                {
+                    _deals.RemoveAt(i);
+                    i--;
+                    continue;
+                }
+
+                UpdeteOpenPositionArray(_deals[i]);
+            }
+           
+            _openLongChanged = true;
+            _openShortChanged = true;
+            _closePositionChanged = true;
+            _closeShortChanged = true;
+            _closeLongChanged = true;
         }
 
         // working with a position
@@ -561,14 +588,16 @@ namespace OsEngine.Journal.Internal
 
             for (int i = _deals.Count - 1; i > _deals.Count - 150 && i > -1; i--)
             {
+                Position position = _deals[i];
+
                 bool isCloseOrder = false;
 
-                if (_deals[i].CloseOrders != null)
+                if (position.CloseOrders != null)
                 {
-                    for (int indexCloseOrd = 0; indexCloseOrd < _deals[i].CloseOrders.Count; indexCloseOrd++)
+                    for (int indexCloseOrd = 0; indexCloseOrd < position.CloseOrders.Count; indexCloseOrd++)
                     {
-                        if (_deals[i].CloseOrders[indexCloseOrd].NumberMarket == trade.NumberOrderParent ||
-                            _deals[i].CloseOrders[indexCloseOrd].NumberUser.ToString() == trade.NumberOrderParent)
+                        if (position.CloseOrders[indexCloseOrd].NumberMarket == trade.NumberOrderParent ||
+                            position.CloseOrders[indexCloseOrd].NumberUser.ToString() == trade.NumberOrderParent)
                         {
                             isCloseOrder = true;
                             break;
@@ -578,12 +607,12 @@ namespace OsEngine.Journal.Internal
                 bool isOpenOrder = false;
 
                 if (isCloseOrder == false ||
-                    _deals[i].OpenOrders != null && _deals[i].OpenOrders.Count > 0)
+                    position.OpenOrders != null && position.OpenOrders.Count > 0)
                 {
-                    for (int indOpenOrd = 0; indOpenOrd < _deals[i].OpenOrders.Count; indOpenOrd++)
+                    for (int indOpenOrd = 0; indOpenOrd < position.OpenOrders.Count; indOpenOrd++)
                     {
-                        if (_deals[i].OpenOrders[indOpenOrd].NumberMarket == trade.NumberOrderParent ||
-                            _deals[i].OpenOrders[indOpenOrd].NumberUser.ToString() == trade.NumberOrderParent)
+                        if (position.OpenOrders[indOpenOrd].NumberMarket == trade.NumberOrderParent ||
+                            position.OpenOrders[indOpenOrd].NumberUser.ToString() == trade.NumberOrderParent)
                         {
                             isOpenOrder = true;
                             break;
@@ -593,16 +622,16 @@ namespace OsEngine.Journal.Internal
 
                 if (isOpenOrder || isCloseOrder)
                 {
-                    PositionStateType positionState = _deals[i].State;
+                    PositionStateType positionState = position.State;
 
-                    decimal lastPosVolume = _deals[i].OpenVolume;
+                    decimal lastPosVolume = position.OpenVolume;
 
-                    _deals[i].SetTrade(trade);
+                    position.SetTrade(trade);
 
-                    if (positionState != _deals[i].State ||
-                        lastPosVolume != _deals[i].OpenVolume)
+                    if (positionState != position.State ||
+                        lastPosVolume != position.OpenVolume)
                     {
-                        UpdeteOpenPositionArray(_deals[i]);
+                        UpdeteOpenPositionArray(position);
                         _openLongChanged = true;
                         _openShortChanged = true;
                         _closePositionChanged = true;
@@ -610,17 +639,17 @@ namespace OsEngine.Journal.Internal
                         _closeLongChanged = true;
                     }
 
-                    if (positionState != _deals[i].State && PositionStateChangeEvent != null)
+                    if (positionState != position.State && PositionStateChangeEvent != null)
                     {
-                        PositionStateChangeEvent(_deals[i]);
+                        PositionStateChangeEvent(position);
                     }
 
-                    if (lastPosVolume != _deals[i].OpenVolume && PositionNetVolumeChangeEvent != null)
+                    if (lastPosVolume != position.OpenVolume && PositionNetVolumeChangeEvent != null)
                     {
-                        PositionNetVolumeChangeEvent(_deals[i]);
+                        PositionNetVolumeChangeEvent(position);
                     }
 
-                    ProcesPosition(_deals[i]);
+                    ProcesPosition(position);
                 }
             }
             _neadToSave = true;
@@ -649,7 +678,8 @@ namespace OsEngine.Journal.Internal
             {
                 for (int i = positions.Count - 1; i > -1; i--)
                 {
-                    if (positions[i].State == PositionStateType.Open)
+                    if (positions[i].State == PositionStateType.Open 
+                        || positions[i].State == PositionStateType.ClosingFail)
                     {
                         decimal profitOld = positions[i].ProfitOperationPunkt;
 
@@ -1115,6 +1145,16 @@ namespace OsEngine.Journal.Internal
 
             CreateTable();
 
+            if(_positionsToPaint == null)
+            {
+                _positionsToPaint = new List<Position>();
+            }
+
+            for(int i = 0;i < AllPositions.Count;i++)
+            {
+                _positionsToPaint.Add(AllPositions[i]);
+            }
+
             _hostOpenDeal = dataGridOpenDeal;
             _hostCloseDeal = dataGridCloseDeal;
 
@@ -1137,6 +1177,7 @@ namespace OsEngine.Journal.Internal
                 _hostCloseDeal.Dispatcher.Invoke(StopPaint);
                 return;
             }
+
             if (_hostCloseDeal != null)
             {
                 _hostCloseDeal.Child = null;
@@ -1144,6 +1185,7 @@ namespace OsEngine.Journal.Internal
                 _hostOpenDeal = null;
                 _hostCloseDeal = null;
             }
+            _positionsToPaint = null;
         }
 
         /// <summary>
@@ -1207,8 +1249,8 @@ namespace OsEngine.Journal.Internal
                     {
                         if ((int)_gridCloseDeal.Rows[i].Cells[0].Value == position.Number)
                         {
-                            _gridCloseDeal.Rows.Remove(_gridCloseDeal.Rows[i]);
-                            _gridCloseDeal.Rows.Insert(i, GetRow(position));
+                            RePaintRowPos(position, _gridCloseDeal.Rows[i]);
+
                             return;
                         }
                     }
@@ -1223,13 +1265,13 @@ namespace OsEngine.Journal.Internal
                     {
                         if ((int)_gridOpenDeal.Rows[i].Cells[0].Value == position.Number)
                         {
-                            _gridOpenDeal.Rows.Remove(_gridOpenDeal.Rows[i]);
-
-                            if (position.State != PositionStateType.Deleted)
+                            if (position.State == PositionStateType.Deleted)
                             {
-                                _gridOpenDeal.Rows.Insert(i, GetRow(position));
+                                _gridOpenDeal.Rows.Remove(_gridOpenDeal.Rows[i]);
                                 return;
                             }
+                            RePaintRowPos(position, _gridOpenDeal.Rows[i]);
+
                             return;
                         }
                     }
@@ -1239,6 +1281,77 @@ namespace OsEngine.Journal.Internal
                         _gridOpenDeal.Rows.Insert(0, GetRow(position));
                     }
                 }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void RePaintRowPos(Position position, DataGridViewRow nRow)
+        {
+            try
+            {
+                nRow.Cells[1].Value = position.TimeOpen;
+
+                nRow.Cells[2].Value = position.TimeClose;
+
+                nRow.Cells[3].Value = position.NameBot;
+
+                nRow.Cells[4].Value = position.SecurityName;
+
+                nRow.Cells[5].Value = position.Direction;
+
+                nRow.Cells[6].Value = position.State;
+
+                nRow.Cells[7].Value = position.MaxVolume.ToStringWithNoEndZero();
+
+                nRow.Cells[8].Value = position.OpenVolume.ToStringWithNoEndZero();
+
+                nRow.Cells[9].Value = position.WaitVolume.ToStringWithNoEndZero();
+
+                if (position.EntryPrice != 0)
+                {
+                    nRow.Cells[10].Value = position.EntryPrice.ToStringWithNoEndZero();
+                }
+                else
+                {
+                    if (position.OpenOrders != null &&
+                        position.OpenOrders.Count != 0 &&
+                        position.State != PositionStateType.OpeningFail)
+                    {
+                        nRow.Cells[10].Value = position.OpenOrders[position.OpenOrders.Count - 1].Price.ToStringWithNoEndZero();
+                    }
+                }
+
+                if (position.ClosePrice != 0)
+                {
+                    nRow.Cells[11].Value = position.ClosePrice.ToStringWithNoEndZero();
+                }
+                else
+                {
+                    if (position.CloseOrders != null &&
+                        position.CloseOrders.Count != 0 &&
+                        position.State != PositionStateType.ClosingFail)
+                    {
+                        nRow.Cells[11].Value = position.CloseOrders[position.CloseOrders.Count - 1].Price.ToStringWithNoEndZero();
+                    }
+                }
+
+                nRow.Cells[12].Value = position.ProfitPortfolioPunkt.ToStringWithNoEndZero();
+
+                nRow.Cells[13].Value = position.StopOrderRedLine.ToStringWithNoEndZero();
+
+                nRow.Cells[14].Value = position.StopOrderPrice.ToStringWithNoEndZero();
+
+                nRow.Cells[15].Value = position.ProfitOrderRedLine.ToStringWithNoEndZero();
+
+                nRow.Cells[16].Value = position.ProfitOrderPrice.ToStringWithNoEndZero();
+
+                nRow.Cells[17].Value = position.SignalTypeOpen;
+
+                nRow.Cells[18].Value = position.SignalTypeClose;
+
             }
             catch (Exception error)
             {
@@ -1256,6 +1369,12 @@ namespace OsEngine.Journal.Internal
             {
                 return;
             }
+
+            if(_positionsToPaint == null)
+            {
+                return;
+            }
+
             try
             {
                 for (int i = 0; i < _positionsToPaint.Count; i++)

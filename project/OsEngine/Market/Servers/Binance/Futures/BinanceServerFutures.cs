@@ -47,6 +47,9 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public BinanceServerFuturesRealization()
         {
             ServerStatus = ServerConnectStatus.Disconnect;
+
+            Thread worker = new Thread(PortfolioUpdater);
+            worker.Start();
         }
 
         private FuturesType futures_type;
@@ -99,6 +102,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 _client.NewTradesEvent -= _client_NewTradesEvent;
                 _client.MyTradeEvent -= _client_MyTradeEvent;
                 _client.MyOrderEvent -= _client_MyOrderEvent;
+                _client.ListenKeyExpiredEvent -= _client_ListenKeyExpiredEvent;
                 _client.LogMessageEvent -= SendLogMessage;
             }
 
@@ -126,6 +130,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 _client.NewTradesEvent += _client_NewTradesEvent;
                 _client.MyTradeEvent += _client_MyTradeEvent;
                 _client.MyOrderEvent += _client_MyOrderEvent;
+                _client.ListenKeyExpiredEvent += _client_ListenKeyExpiredEvent;
                 _client.LogMessageEvent += SendLogMessage;
             }
 
@@ -186,6 +191,15 @@ namespace OsEngine.Market.Servers.Binance.Futures
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
+        }
+
+        /// <summary>
         /// subscribe
         /// подписаться 
         /// </summary>
@@ -203,7 +217,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             if (endTime > DateTime.Now - new TimeSpan(0, 0, 1, 0))
                 endTime = DateTime.Now - new TimeSpan(0, 0, 1, 0);
 
-            int interval = 500 * (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes ;
+            int interval = 500 * (int)timeFrameBuilder.TimeFrameTimeSpan.TotalMinutes;
 
             List<Candle> candles = new List<Candle>();
 
@@ -249,6 +263,8 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// </summary>
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime lastDate)
         {
+            endTime = endTime.AddDays(1);
+
             string markerDateTime = "";
 
             List<Trade> trades = new List<Trade>();
@@ -270,8 +286,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 if (newTrades != null && newTrades.Count != 0)
                     trades.AddRange(newTrades);
                 else
+                {
+                    startOver.AddDays(1);
                     break;
-
+                }    
+                   
                 startOver = trades[trades.Count - 1].Time.AddMilliseconds(1);
 
 
@@ -349,6 +368,18 @@ namespace OsEngine.Market.Servers.Binance.Futures
             return candles;
         }
 
+        /// <summary>
+        /// renewing of the expired listen key
+        /// обновление заэкспарившегося listen key
+        /// </summary>
+        void _client_ListenKeyExpiredEvent(BinanceClientFutures client)
+        {
+            if (client != null)
+            {
+                client.RenewListenKey();
+            }
+        }
+
         //parsing incoming data
         // разбор входящих данных
 
@@ -398,7 +429,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         trades.data.q.ToDecimal();
                 trade.Side = trades.data.m == true ? Side.Sell : Side.Buy;
 
-                NewTradesEvent?.Invoke(trade);            
+                NewTradesEvent?.Invoke(trade);
             }
         }
 
@@ -491,10 +522,27 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private List<Portfolio> _portfolios = new List<Portfolio>();
 
+        private void PortfolioUpdater()
+        {
+            while (true)
+            {
+                Thread.Sleep(30000);
+
+                if (this.ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    continue;
+                }
+
+                _client.GetBalance();
+            }
+        }
+
         void _client_UpdatePortfolio(AccountResponseFuturesFromWebSocket portfs)
         {
             try
             {
+                return;
+
                 if (portfs == null)
                 {
                     return;
@@ -547,20 +595,31 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         continue;
                     }
 
-                    if(onePortf.ep.ToDecimal() == 0)
+                    if (onePortf.ep.ToDecimal() == 0)
                     {
                         continue;
                     }
 
                     allPosesIsNull = false;
 
+                    string name = onePortf.s;
+
+                    if (onePortf.pa.ToDecimal() > 0)
+                    {
+                        name += "_LONG";
+                    }
+                    else
+                    {
+                        name += "_SHORT";
+                    }
+
                     PositionOnBoard neeedPortf =
-                        portfolio.GetPositionOnBoard().Find(p => p.SecurityNameCode == onePortf.s);
+                        portfolio.GetPositionOnBoard().Find(p => p.SecurityNameCode == name);
 
                     if (neeedPortf == null)
                     {
                         PositionOnBoard newPositionOnBoard = new PositionOnBoard();
-                        newPositionOnBoard.SecurityNameCode = onePortf.s;
+                        newPositionOnBoard.SecurityNameCode = name;
                         newPositionOnBoard.PortfolioName = portfolio.Number;
                         newPositionOnBoard.ValueBegin =
                             onePortf.pa.ToDecimal();
@@ -572,7 +631,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         onePortf.pa.ToDecimal();
                 }
 
-                if(allPosesIsNull == true)
+                if (allPosesIsNull == true)
                 {
                     foreach (var onePortf in portfs.a.P)
                     {
@@ -599,7 +658,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         neeedPortf.ValueCurrent = 0;
                         break;
                     }
-
                 }
 
                 if (PortfolioEvent != null)
@@ -642,6 +700,27 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         onePortf.marginBalance.ToDecimal();
                     newPortf.ValueCurrent =
                         onePortf.marginBalance.ToDecimal();
+
+                    myPortfolio.SetNewPosition(newPortf);
+                }
+
+                foreach (var onePortf in portfs.positions)
+                {
+                    if (string.IsNullOrEmpty(onePortf.positionAmt))
+                    {
+                        continue;
+                    }
+
+                    PositionOnBoard newPortf = new PositionOnBoard();
+
+                    string name = onePortf.symbol + "_" + onePortf.positionSide;
+
+                    newPortf.SecurityNameCode = name;
+                    newPortf.ValueBegin =
+                        onePortf.positionAmt.ToDecimal();
+
+                    newPortf.ValueCurrent =
+                        onePortf.positionAmt.ToDecimal();
 
                     myPortfolio.SetNewPosition(newPortf);
                 }
@@ -703,10 +782,10 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 }
 
                 if (sec.filters.Count > 1 &&
-                    sec.filters[2] != null &&
-                    sec.filters[2].minQty != null)
+                    sec.filters[1] != null &&
+                    sec.filters[1].minQty != null)
                 {
-                    decimal minQty = sec.filters[2].minQty.ToDecimal();
+                    decimal minQty = sec.filters[1].minQty.ToDecimal();
                     string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
                     if (qtyInStr.Split('.').Length > 1)
                     {
@@ -720,7 +799,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
             List<Security> secNonPerp = new List<Security>();
 
-            for(int i = 0;i < _securities.Count;i++)
+            for (int i = 0; i < _securities.Count; i++)
             {
                 string[] str = _securities[i].Name.Split('_');
 
@@ -746,9 +825,9 @@ namespace OsEngine.Market.Servers.Binance.Futures
         {
             List<Security> secHistorical = new List<Security>();
 
-            for(int i = 0;i < securities.Count;i++)
+            for (int i = 0; i < securities.Count; i++)
             {
-                if(secHistorical.Find(s => s.Name.Split('_')[0] == securities[i].Name.Split('_')[0]) != null)
+                if (secHistorical.Find(s => s.Name.Split('_')[0] == securities[i].Name.Split('_')[0]) != null)
                 {
                     continue;
                 }
@@ -793,7 +872,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
             security.Decimals = sec.Decimals;
             security.DecimalsVolume = sec.DecimalsVolume;
-               
+
             security.State = SecurityStateType.Activ;
 
             return security;

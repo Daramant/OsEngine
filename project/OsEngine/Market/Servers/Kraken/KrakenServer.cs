@@ -233,6 +233,15 @@ namespace OsEngine.Market.Servers.Kraken
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
+        }
+
+        /// <summary>
         /// subscribe
         /// подписаться 
         /// </summary>
@@ -264,7 +273,7 @@ namespace OsEngine.Market.Servers.Kraken
 
                 Candle lastCandle = newCandles[newCandles.Count - 1];
 
-                candles.Merge(newCandles);
+                candles = candles.Merge(newCandles);
 
                 if(newCandles.Count == 1)
                 {

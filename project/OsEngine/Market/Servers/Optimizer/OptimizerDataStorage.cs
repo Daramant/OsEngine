@@ -22,12 +22,13 @@ namespace OsEngine.Market.Servers.Optimizer
 		/// constructor
         /// конструктор
         /// </summary>
-        public OptimizerDataStorage(string name)
+        public OptimizerDataStorage(string name, bool neadToCreateThread)
         {
             Name = name;
 
-            _logMaster = new Log("TesterServer",StartProgram.IsOsOptimizer);
-            _logMaster.Listen(this);
+            _logMaster = new Log("OptimizerServer",StartProgram.IsOsOptimizer);
+            _logMaster.Listen(this)
+                ;
             TypeTesterData = TesterDataType.Candle;
             Load();
 
@@ -36,7 +37,7 @@ namespace OsEngine.Market.Servers.Optimizer
                 _needToReloadSecurities = true;
             }
 
-            if (_worker == null)
+            if(neadToCreateThread == true)
             {
                 _worker = new Thread(WorkThreadArea);
                 _worker.CurrentCulture = new CultureInfo("ru-RU");
@@ -47,6 +48,33 @@ namespace OsEngine.Market.Servers.Optimizer
 
             CheckSet();
         }
+
+        public void ClearDelete()
+        {
+            _isDeleted = true;
+
+            if (_storages != null)
+            {
+                for (int i = 0; i < _storages.Count; i++)
+                {
+                    _storages[i].ClearDelete();
+                }
+
+                _storages.Clear();
+                _storages = null;
+            }
+            if (SecuritiesTester != null)
+            {
+                for (int i = 0; i < SecuritiesTester.Count; i++)
+                {
+                    SecuritiesTester[i].Clear();
+                }
+                SecuritiesTester.Clear();
+                SecuritiesTester = null;
+            }
+        }
+
+        private bool _isDeleted;
 
         /// <summary>
 		/// main thread for downloading all data
@@ -68,9 +96,13 @@ namespace OsEngine.Market.Servers.Optimizer
         {
             while (true)
             {
-                Thread.Sleep(2000);
+                Thread.Sleep(50);
                 try
                 {
+                    if(_isDeleted == true)
+                    {
+                        return;
+                    }
                     if (_needToReloadSecurities)
                     {
                         _needToReloadSecurities = false;
@@ -274,15 +306,6 @@ namespace OsEngine.Market.Servers.Optimizer
                 LoadSecurities();
             }
         }
-
-        /// <summary>
-        /// очистить данные
-        /// </summary>
-        public void ClearStorages()
-        {
-            _storages.Clear();
-        }
-
 
         /// <summary>
 		/// path to folder with data
@@ -1973,6 +1996,30 @@ DateTime timeEnd)
         /// время завершения скачивания этой серии свечек
         /// </summary>
         public DateTime TimeEnd;
+
+        public void ClearDelete()
+        {
+            Security = null;
+
+            if(Candles != null)
+            {
+                Candles.Clear();
+                Candles = null;
+            }
+
+            if(Trades != null)
+            {
+                Trades.Clear();
+                Trades = null;
+            }
+
+            if (MaketDepths != null)
+            {
+                MaketDepths.Clear();
+                MaketDepths = null;
+            }
+
+        }
     }
 
 }

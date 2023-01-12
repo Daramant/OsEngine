@@ -55,6 +55,10 @@ namespace OsEngine.Language
             "Eng:Find on chart_" +
             "Ru:Найти на графике_");
 
+        public string PositionMenuItem13 => OsLocalization.ConvertToLocString(
+            "Eng:Create position_" +
+            "Ru:Создать позицию_");
+
         public string TitleJournalUi => OsLocalization.ConvertToLocString(
             "Eng:Journal_" +
             "Ru:Журнал_");
@@ -74,6 +78,50 @@ namespace OsEngine.Language
         public string Label4 => OsLocalization.ConvertToLocString(
             "Eng:Volume Assemblage_" +
             "Ru:Ассемблирование объёма_");
+
+        public string Label5 => OsLocalization.ConvertToLocString(
+            "Eng:From_" +
+            "Ru:От_");
+
+        public string Label6 => OsLocalization.ConvertToLocString(
+            "Eng:To_" +
+            "Ru:До_");
+
+        public string Label7 => OsLocalization.ConvertToLocString(
+            "Eng:Reload_" +
+             "Ru:Перезагрузить_");
+
+        public string Label8 => OsLocalization.ConvertToLocString(
+            "Eng:Chart Type_" +
+            "Ru:Тип линии_");
+
+        public string Label9 => OsLocalization.ConvertToLocString(
+            "Eng:Group_" +
+            "Ru:Группа_");
+
+        public string Label10 => OsLocalization.ConvertToLocString(
+            "Eng:Name_" +
+            "Ru:Имя_");
+
+        public string Label11 => OsLocalization.ConvertToLocString(
+            "Eng:Class_" +
+            "Ru:Класс_");
+
+        public string Label12 => OsLocalization.ConvertToLocString(
+            "Eng:On/Off_" +
+            "Ru:Вкл/выкл_");
+
+        public string Label13 => OsLocalization.ConvertToLocString(
+           "Eng:New Bots Group Creation_" +
+           "Ru:Создание новой группы_");
+
+        public string Label14 => OsLocalization.ConvertToLocString(
+          "Eng:Accept_" +
+          "Ru:Принять_");
+
+        public string Label15 => OsLocalization.ConvertToLocString(
+          "Eng:Auto update_" +
+          "Ru:Обновление_");
 
         public string TabItem1 => OsLocalization.ConvertToLocString(
             "Eng:Equity_" +
@@ -175,6 +223,10 @@ namespace OsEngine.Language
             "Eng:Commission amount_" +
             "Ru:Объём комиссии_");
 
+        public string GridRow17 => OsLocalization.ConvertToLocString(
+            "Eng:Average trade time_" +
+            "Ru:Среднее время удержания_");
+
         public string Message1 => OsLocalization.ConvertToLocString(
             "Eng:You must select a file to save!_" +
             "Ru:Необходимо выбрать файл для сохранения!_");
@@ -183,5 +235,12 @@ namespace OsEngine.Language
             "Eng:You must select a file to load!_" +
             "Ru:Необходимо выбрать файл для загрузки!_");
 
+        public string Message3 => OsLocalization.ConvertToLocString(
+             "Eng:Are you sure you want to delete the position?_" +
+             "Ru:Вы уверены что хотите удалить позицию?_");
+
+        public string Message4 => OsLocalization.ConvertToLocString(
+             "Eng:Are you sure you want to delete positions?_" +
+             "Ru:Вы уверены что хотите очистить журнал? Данные будет не восстановить!_");
     }
 }

@@ -17,6 +17,8 @@ using OsEngine.Journal.Internal;
 using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market;
+using OsEngine.Market.Servers;
+using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.OsTrader.RiskManager;
 
@@ -158,6 +160,7 @@ namespace OsEngine.OsTrader.Panels
 
         void _chartUi_Closed(object sender, EventArgs e)
         {
+            _chartUi.Closed -= _chartUi_Closed;
             _chartUi = null;
 
             if (ChartClosedEvent != null)
@@ -267,18 +270,22 @@ namespace OsEngine.OsTrader.Panels
                 for (int i = 0; _botTabs != null && i < _botTabs.Count; i++)
                 {
                     _botTabs[i].StopPaint();
-                    try
-                    {
-                        _log.StopPaint();
-                    }
-                    catch
-                    {
-                        // ignore
-                    }
-
                 }
 
-                _tabBotTab = null;
+                try
+                {
+                    _log.StopPaint();
+                }
+                catch (Exception error)
+                {
+                    LogMessageEvent(error.ToString(), LogMessageType.Error);
+                }
+
+                if(_tabBotTab != null)
+                {
+                    _tabBotTab.SelectionChanged -= _tabBotTab_SelectionChanged;
+                }
+           
                 _tabBotTab = null;
                 _hostChart = null;
                 _hostGlass = null;
@@ -385,22 +392,67 @@ namespace OsEngine.OsTrader.Panels
         {
             try
             {
-                _riskManager.Delete();
+                if (_riskManager != null)
+                {
+                    _riskManager.RiskManagerAlarmEvent -= _riskManager_RiskManagerAlarmEvent;
+                    _riskManager.Delete();
+                    _riskManager = null;
+                }
 
                 if (_botTabs != null)
                 {
                     for (int i = 0; i < _botTabs.Count; i++)
                     {
+                        _botTabs[i].StopPaint();
                         _botTabs[i].Delete();
+                        _botTabs[i].LogMessageEvent -= SendNewLogMessage;
+                    }
+                    _botTabs.Clear();
+                    _botTabs = null;
+                }
+
+                if(ParamGuiSettings != null)
+                {
+                    ParamGuiSettings.LogMessageEvent -= SendNewLogMessage;
+                    ParamGuiSettings = null;
+
+                    if (File.Exists(@"Engine\" + NameStrategyUniq + @"Parametrs.txt"))
+                    {
+                        File.Delete(@"Engine\" + NameStrategyUniq + @"Parametrs.txt");
                     }
                 }
 
-                if (File.Exists(@"Engine\" + NameStrategyUniq + @"Parametrs.txt"))
+                if(_log != null)
                 {
-                    File.Delete(@"Engine\" + NameStrategyUniq + @"Parametrs.txt");
+                    _log.Delete();
+                    _log = null;
                 }
 
-                _log.Delete();
+                if(_parameters != null)
+                {
+                    for(int i = 0;i < _parameters.Count;i++)
+                    {
+                        _parameters[i].ValueChange -= Parameter_ValueChange;
+                    }
+                    _parameters.Clear();
+                    _parameters = null;
+                }
+
+                if(_tabBotTab != null)
+                {
+                    _tabBotTab.SelectionChanged -= _tabBotTab_SelectionChanged;
+                    _tabBotTab = null;
+                }
+
+                _gridChart = null;
+                _hostChart = null;
+                _hostGlass = null;
+                _hostOpenDeals = null;
+                _hostCloseDeals = null;
+                _rectangle = null;
+                _hostAlerts = null;
+                _textBoxLimitPrice = null;
+                _gridChartControlPanel = null;
 
                 if (DeleteEvent != null)
                 {
@@ -462,6 +514,42 @@ position => position.State != PositionStateType.OpeningFail
 && position.EntryPrice != 0 && position.ClosePrice != 0));
 
                     result += PositionStaticticGenerator.GetAllProfitPersent(positions.ToArray());
+                }
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// total profit absolute
+        /// итоговая прибыль в абсолютном выражении
+        /// </summary>
+        public decimal TotalProfitAbs
+        {
+            get
+            {
+                List<Journal.Journal> journals = GetJournals();
+
+                if (journals == null ||
+                    journals.Count == 0)
+                {
+                    return 0;
+                }
+
+                decimal result = 0;
+
+                for (int i = 0; i < journals.Count; i++)
+                {
+                    if (journals[i].AllPosition == null ||
+                        journals[i].AllPosition.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    List<Position> positions = journals[i].AllPosition.FindAll((
+position => position.State != PositionStateType.OpeningFail
+&& position.EntryPrice != 0 && position.ClosePrice != 0));
+
+                    result += PositionStaticticGenerator.GetAllProfitInPunkt(positions.ToArray());
                 }
                 return result;
             }
@@ -609,6 +697,7 @@ position => position.State != PositionStateType.OpeningFail
         {
             get
             {
+
                 List<Journal.Journal> journals = GetJournals();
 
                 if (journals == null ||
@@ -651,15 +740,18 @@ position => position.State != PositionStateType.OpeningFail
             {
                 _paramUi = new ParemetrsUi(_parameters, ParamGuiSettings);
                 _paramUi.Show();
-                _paramUi.Closing += (a, b) =>
-                {
-                    _paramUi = null;
-                };
+                _paramUi.Closing += _paramUi_Closing;
             }
             else
             {
                 _paramUi.Activate();
             }
+        }
+
+        private void _paramUi_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _paramUi.Closing -= _paramUi_Closing;
+            _paramUi = null;
         }
 
         private ParemetrsUi _paramUi;
@@ -871,9 +963,9 @@ position => position.State != PositionStateType.OpeningFail
                     reader.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                LogMessageEvent(error.ToString(), LogMessageType.Error);
             }
         }
 
@@ -928,9 +1020,9 @@ position => position.State != PositionStateType.OpeningFail
                     writer.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                LogMessageEvent(error.ToString(), LogMessageType.Error);
             }
         }
 
@@ -1013,6 +1105,14 @@ position => position.State != PositionStateType.OpeningFail
                         BotTabSimple bot = (BotTabSimple)_botTabs[i];
                         bot.CloseAllAtMarket();
                         bot.Portfolio = null;
+
+                        if (bot.Connector.ServerType == ServerType.Tester)
+                        {
+                            List<IServer> allServers = ServerMaster.GetServers();
+                            TesterServer testServer = (TesterServer)allServers.Find(server => server.ServerType == ServerType.Tester);
+                            testServer.TesterRegime = TesterRegime.Pause;
+                        }
+
                     }
                 }
             }
@@ -1057,7 +1157,10 @@ position => position.State != PositionStateType.OpeningFail
             {
                 try
                 {
-                    if (ActivTab == null || _tabBotTab.Items.Count == 0)
+                    if (ActivTab == null 
+                        || _tabBotTab == null 
+                        || _tabBotTab.Items == null 
+                        || _tabBotTab.Items.Count == 0)
                     {
                         return -1;
                     }
@@ -1249,7 +1352,9 @@ position => position.State != PositionStateType.OpeningFail
                 }
 
                 ActivTab.Delete();
+
                 _botTabs.Remove(ActivTab);
+
                 if (_botTabs != null && _botTabs.Count != 0)
                 {
                     ChangeActivTab(0);
@@ -1494,11 +1599,6 @@ position => position.State != PositionStateType.OpeningFail
 
         private Log _log;
 
-        public List<LogMessage> GetLogMessages()
-        {
-            return _log.GetLogMessages();
-        }
-
         /// <summary>
         /// send new message / 
         /// выслать новое сообщение на верх
@@ -1703,4 +1803,5 @@ position => position.State != PositionStateType.OpeningFail
         /// </summary>
         Off
     }
+
 }

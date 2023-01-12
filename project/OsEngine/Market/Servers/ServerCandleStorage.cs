@@ -23,7 +23,6 @@ namespace OsEngine.Market.Servers
         /// <param name="server"> server for saving ticks / сервер с которого будем сохранять тики </param>
         public ServerCandleStorage(IServer server)
         {
-            _server = server;
 
             if (!Directory.Exists(@"Data"))
             {
@@ -38,8 +37,6 @@ namespace OsEngine.Market.Servers
             saver.Start();
         }
 
-        private IServer _server;
-
         /// <summary>
         /// directory for saving data
         /// название папки для хранения данных
@@ -47,6 +44,8 @@ namespace OsEngine.Market.Servers
         private string _pathName;
 
         public bool NeadToSave;
+
+        public int CandlesSaveCount;
 
         /// <summary>
         /// securities for saving
@@ -60,9 +59,20 @@ namespace OsEngine.Market.Servers
         /// </summary>
         public void SetSeriesToSave(CandleSeries series)
         {
+            string spec = series.Specification;
+
             for (int i = 0; i < _series.Count; i++)
             {
-                if (_series[i].Specification == series.Specification)
+                if (_series[i].Specification == spec)
+                {
+                    _series.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; i < _series.Count; i++)
+            {
+                if (_series[i].UID == series.UID)
                 {
                     _series.RemoveAt(i);
                     break;
@@ -70,6 +80,18 @@ namespace OsEngine.Market.Servers
             }
 
             _series.Add(series);
+        }
+
+        public void RemoveSeries(CandleSeries series)
+        {
+            for (int i = 0; i < _series.Count; i++)
+            {
+                if (_series[i].UID == series.UID)
+                {
+                    _series.RemoveAt(i);
+                    break;
+                }
+            }
         }
 
         // for saving in one file
@@ -119,7 +141,9 @@ namespace OsEngine.Market.Servers
             }
 
         }
+
         private List<CandleSeriesSaveInfo> _candleSeriesSaveInfos = new List<CandleSeriesSaveInfo>();
+
         private object _lockerSpec = new object();
 
         public CandleSeriesSaveInfo GetSpecInfo(string specification)
@@ -149,13 +173,6 @@ namespace OsEngine.Market.Servers
         {
             CandleSeriesSaveInfo mySaveInfo = GetSpecInfo(series.Specification);
 
-            if (mySaveInfo.AllCandlesInFile == null)
-            {
-                mySaveInfo.AllCandlesInFile = series.CandlesAll;
-
-                int indexSpec = _candleSeriesSaveInfos.FindIndex(s => s.Specification == series.Specification);
-                _candleSeriesSaveInfos[indexSpec].AllCandlesInFile = series.CandlesAll;
-            }
             if (series.CandlesAll == null ||
                 series.CandlesAll.Count == 0)
             {
@@ -165,28 +182,33 @@ namespace OsEngine.Market.Servers
             Candle firstCandle = series.CandlesAll[0];
             Candle lastCandle = series.CandlesAll[series.CandlesAll.Count - 1];
 
-            if (firstCandle.TimeStart == mySaveInfo.LastCandleTime &&
-                lastCandle.TimeStart == mySaveInfo.StartCandleTime &&
-                lastCandle.Close == mySaveInfo.LastCandlePrice)
+            if (mySaveInfo.LastCandleTime != null
+                && mySaveInfo.AllCandlesInFile != null)
             {
-                return;
+                if (firstCandle.TimeStart == mySaveInfo.LastCandleTime &&
+                    lastCandle.TimeStart == mySaveInfo.StartCandleTime &&
+                    lastCandle.Close == mySaveInfo.LastCandlePrice)
+                {
+                    return;
+                }
             }
 
-            mySaveInfo.InsertCandles(series.CandlesAll);
+            mySaveInfo.InsertCandles(series.CandlesAll, CandlesSaveCount);
 
             if (Directory.Exists(_pathName) == false)
             {
                 Directory.CreateDirectory(_pathName);
             }
 
-            StreamWriter writer = new StreamWriter(_pathName + "\\" + series.Specification + ".txt");
-
-            for (int i = 0; i < mySaveInfo.AllCandlesInFile.Count; i++)
+            using (StreamWriter writer = new StreamWriter(_pathName + "\\" + series.Specification + ".txt"))
             {
-                writer.WriteLine(mySaveInfo.AllCandlesInFile[i].StringToSave);
-            }
+                for (int i = 0; i < mySaveInfo.AllCandlesInFile.Count; i++)
+                {
+                    writer.WriteLine(mySaveInfo.AllCandlesInFile[i].StringToSave);
+                }
 
-            writer.Close();
+                writer.Close();
+            }
         }
 
         public List<Candle> GetCandles(string specification, int count)
@@ -202,7 +224,19 @@ namespace OsEngine.Market.Servers
                 candles = candles.GetRange(candles.Count - 1 - count, count);
             }
 
-            return candles;
+            if (candles == null)
+            {
+                return null;
+            }
+
+            List<Candle> newArray = new List<Candle>();
+
+            for (int i = 0; i < candles.Count; i++)
+            {
+                newArray.Add(candles[i]);
+            }
+
+            return newArray;
         }
 
         public CandleSeriesSaveInfo TryLoadCandle(string specification)
@@ -228,7 +262,7 @@ namespace OsEngine.Market.Servers
                 }
                 catch (Exception e)
                 {
-                   // ignore
+                    // ignore
                 }
             }
 
@@ -274,7 +308,7 @@ namespace OsEngine.Market.Servers
                 candlesFromServer.Count != 0)
             {
                 resultCandles = candlesFromServer;
-                resultCandles.Merge(candlesFromOsData);
+                resultCandles = resultCandles.Merge(candlesFromOsData);
             }
             else if (candlesFromServer.Count != 0)
             {
@@ -287,7 +321,7 @@ namespace OsEngine.Market.Servers
 
             CandleSeriesSaveInfo myInfo = new CandleSeriesSaveInfo();
             myInfo.Specification = specification;
-            myInfo.InsertCandles(resultCandles);
+            myInfo.InsertCandles(resultCandles, CandlesSaveCount);
 
             return myInfo;
         }
@@ -323,23 +357,73 @@ namespace OsEngine.Market.Servers
     /// </summary>
     public class CandleSeriesSaveInfo
     {
-        public void InsertCandles(List<Candle> candles)
+
+        private int _lastCandleCount;
+
+        private DateTime _lastCandleTime;
+
+        public void InsertCandles(List<Candle> candles, int maxCount)
         {
-            if (AllCandlesInFile == null)
+            if (candles == null)
             {
-                AllCandlesInFile = new List<Candle>();
+                return;
             }
 
-            AllCandlesInFile.Merge(candles);
+            if (AllCandlesInFile == null
+                || AllCandlesInFile.Count == 0)
+            { 
+                // первая прогрузка свечками
+                AllCandlesInFile = new List<Candle>();
+
+                for (int i = 0; i < candles.Count; i++)
+                {
+                    AllCandlesInFile.Add(candles[i]);
+                }
+            }
+            else if(_lastCandleCount == candles.Count &&
+                candles[candles.Count-1].TimeStart == _lastCandleTime)
+            { 
+                // обновилась последняя свеча
+                AllCandlesInFile[AllCandlesInFile.Count - 1] = candles[candles.Count - 1];
+            }
+            else if(candles.Count > 1 
+                && _lastCandleCount + 1 == candles.Count
+                && candles[candles.Count - 2].TimeStart == _lastCandleTime)
+            { 
+                // добавилась одна свечка
+                AllCandlesInFile.Add(candles[candles.Count - 1]);
+            }
+            else
+            { 
+                // добавилось не ясное кол-во свечей
+                AllCandlesInFile = AllCandlesInFile.Merge(candles);
+            }
 
             if (AllCandlesInFile.Count == 0)
             {
                 return;
             }
 
+            _lastCandleCount = candles.Count;
+            _lastCandleTime = candles[candles.Count - 1].TimeStart;
+
             LastCandleTime = AllCandlesInFile[AllCandlesInFile.Count - 1].TimeStart;
             StartCandleTime = AllCandlesInFile[0].TimeStart;
             LastCandlePrice = AllCandlesInFile[AllCandlesInFile.Count - 1].Close;
+
+            TryTrim(maxCount);
+        }
+
+        private void TryTrim(int count)
+        {
+            if (AllCandlesInFile.Count < count)
+            {
+                return;
+            }
+
+            AllCandlesInFile = AllCandlesInFile.GetRange(AllCandlesInFile.Count - count, count);
+
+            StartCandleTime = AllCandlesInFile[0].TimeStart;
         }
 
         public List<Candle> AllCandlesInFile;

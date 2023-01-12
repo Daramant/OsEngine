@@ -188,7 +188,7 @@ namespace OsEngine.OsOptimizer
             }
 
             return false;
-        }
+        } 
 
         /// <summary>
         /// robot sorting type in the results table
@@ -737,6 +737,11 @@ namespace OsEngine.OsOptimizer
                 OptimizerReport bestBotInOutOfSample
                     = _reports[i + 1].Reports.Find(b => b.BotName.Replace(" OutOfSample", "") == bestBot.BotName.Replace(" InSample", ""));
 
+                if(bestBotInOutOfSample == null)
+                {
+                    continue;
+                }
+
                 decimal value = bestBotInOutOfSample.AverageProfitPercent;
 
                 if (values.Count == 0)
@@ -758,9 +763,16 @@ namespace OsEngine.OsOptimizer
 
             ChartPainterLine.Paint(_windowsFormsHostOutOfSampleEquity, values);
 
-            _outOfSampleLabel.Content = _outOfSampleLabel.Content.ToString().Split('(')[0]  + 
-                "( Total: " + Math.Round(values[values.Count-1], 4) + ". Average: " + Math.Round(averageProfitPercent,4) + " )" ;
-        }
+            try
+            {
+                _outOfSampleLabel.Content = _outOfSampleLabel.Content.ToString().Split('(')[0] +
+                "( Total: " + Math.Round(values[values.Count - 1], 4) + ". Average: " + Math.Round(averageProfitPercent, 4) + " )";
+            }
+            catch
+            {
+                // ignore
+            }
+}
 
         // логирование
 

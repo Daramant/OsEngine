@@ -57,6 +57,9 @@ namespace OsEngine.OsData
             Title = OsLocalization.Data.TitleNewSecurity;
             Label1.Content = OsLocalization.Data.Label1;
             ButtonAccept.Content = OsLocalization.Data.ButtonAccept;
+
+            this.Activate();
+            this.Focus();
         }
 
         private Dictionary<string, List<Security>> BuildSecurityGroupsDictionary(List<Security> securities)

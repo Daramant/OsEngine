@@ -566,7 +566,7 @@ namespace OsEngine.Market.Servers.AstsBridge
         {
             if (_candleManager == null)
             {
-                _candleManager = new CandleManager(this);
+                _candleManager = new CandleManager(this,StartProgram.IsOsTrader);
                 _candleManager.CandleUpdateEvent += _candleManager_CandleUpdateEvent;
                 _candleManager.LogMessageEvent += SendLogMessage;
             }
@@ -1488,6 +1488,15 @@ namespace OsEngine.Market.Servers.AstsBridge
             {
                 AstsServer.CancelOrder(order);
             }
+        }
+
+        /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+            
         }
 
         /// <summary>

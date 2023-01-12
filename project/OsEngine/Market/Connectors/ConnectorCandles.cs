@@ -72,6 +72,18 @@ namespace OsEngine.Market.Connectors
         }
 
         /// <summary>
+        /// program that created the bot which created this connection
+        /// программа создавшая робота который создал это подключение
+        /// </summary>
+        public StartProgram StartProgram;
+
+        /// <summary>
+        /// shows whether it is possible to save settings
+        /// можно ли сохранять настройки
+        /// </summary>
+        private bool _canSave;
+
+        /// <summary>
         /// upload
         /// загрузить
         /// </summary>
@@ -102,18 +114,6 @@ namespace OsEngine.Market.Connectors
         }
 
         /// <summary>
-        /// program that created the bot which created this connection
-        /// программа создавшая робота который создал это подключение
-        /// </summary>
-        public StartProgram StartProgram;
-
-        /// <summary>
-        /// shows whether it is possible to save settings
-        /// можно ли сохранять настройки
-        /// </summary>
-        private bool _canSave;
-
-        /// <summary>
         /// save object settings in file
         /// сохранить настройки объекта в файл
         /// </summary>
@@ -123,7 +123,11 @@ namespace OsEngine.Market.Connectors
             {
                 return;
             }
-            try
+            if (StartProgram == StartProgram.IsOsOptimizer)
+            {
+                return;
+            }
+                try
             {
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"ConnectorPrime.txt", false))
                 {
@@ -148,16 +152,28 @@ namespace OsEngine.Market.Connectors
         /// </summary>
         public void Delete()
         {
-            TimeFrameBuilder.Delete();
-            if (File.Exists(@"Engine\" + _name + @"ConnectorPrime.txt"))
+          if(StartProgram != StartProgram.IsOsOptimizer)
             {
-                File.Delete(@"Engine\" + _name + @"ConnectorPrime.txt");
+                TimeFrameBuilder.Delete();
+
+                if (File.Exists(@"Engine\" + _name + @"ConnectorPrime.txt"))
+                {
+                    File.Delete(@"Engine\" + _name + @"ConnectorPrime.txt");
+                }
             }
 
             if (_mySeries != null)
             {
                 _mySeries.Stop();
                 _mySeries.Clear();
+                _mySeries.СandleUpdeteEvent -= MySeries_СandleUpdeteEvent;
+                _mySeries.СandleFinishedEvent -= MySeries_СandleFinishedEvent;
+
+                if (_myServer != null)
+                {
+                    _myServer.StopThisSecurity(_mySeries);
+                }
+                _mySeries = null;
             }
 
             if (_emulator != null)
@@ -175,6 +191,7 @@ namespace OsEngine.Market.Connectors
                 _myServer.NewTradeEvent -= ConnectorBot_NewTradeEvent;
                 _myServer.TimeServerChangeEvent -= myServer_TimeServerChangeEvent;
                 _myServer.NeadToReconnectEvent -= _myServer_NeadToReconnectEvent;
+                _myServer = null;
             }
 
             _neadToStopThread = true;
@@ -200,6 +217,7 @@ namespace OsEngine.Market.Connectors
                 ui.IsCanChangeSaveTradesInCandles(canChangeSettingsSaveCandlesIn);
                 ui.LogMessageEvent += SendNewLogMessage;
                 ui.ShowDialog();
+                ui.LogMessageEvent -= SendNewLogMessage;
             }
             catch (Exception error)
             {
@@ -227,6 +245,13 @@ namespace OsEngine.Market.Connectors
             {
                 _mySeries.Stop();
                 _mySeries.Clear();
+                _mySeries.СandleUpdeteEvent -= MySeries_СandleUpdeteEvent;
+                _mySeries.СandleFinishedEvent -= MySeries_СandleFinishedEvent;
+
+                if (_myServer != null)
+                {
+                    _myServer.StopThisSecurity(_mySeries);
+                }
                 _mySeries = null;
             }
 
@@ -544,6 +569,11 @@ namespace OsEngine.Market.Connectors
             get { return TimeFrameBuilder.TimeFrameTimeSpan; }
         }
 
+        public CandleSeries CandleSeries
+        {
+            get { return _mySeries; }
+        }
+
         /// <summary>
         /// candle series that collects candles  
         /// серия свечек которая собирает для нас свечки
@@ -708,12 +738,18 @@ namespace OsEngine.Market.Connectors
                     _lastReconnectTime = DateTime.Now;
                 }
 
+
                 if (_mySeries != null)
                 {
+                    _mySeries.Stop();
+                    _mySeries.Clear();
                     _mySeries.СandleUpdeteEvent -= MySeries_СandleUpdeteEvent;
                     _mySeries.СandleFinishedEvent -= MySeries_СandleFinishedEvent;
-                    _mySeries.Stop();
 
+                    if (_myServer != null)
+                    {
+                        _myServer.StopThisSecurity(_mySeries);
+                    }
                     _mySeries = null;
                 }
 
@@ -749,6 +785,8 @@ namespace OsEngine.Market.Connectors
 
         private bool _neadToStopThread;
 
+        private object _myServerLocker = new object();
+
         /// <summary>
         /// subscribe to receive candle
         /// подписаться на получение свечек
@@ -759,7 +797,18 @@ namespace OsEngine.Market.Connectors
             {
                 while (true)
                 {
-                    Thread.Sleep(1);
+                    if(ServerType == ServerType.Optimizer)
+                    {
+                        Thread.Sleep(1);
+                    }
+                    else if(ServerType == ServerType.Tester)
+                    {
+                        Thread.Sleep(10);
+                    }
+                    else
+                    {
+                        Thread.Sleep(500);
+                    }
 
                     if (_neadToStopThread)
                     {
@@ -849,13 +898,25 @@ namespace OsEngine.Market.Connectors
                             {
                                 return;
                             }
+                            if (_myServer == null)
+                            {
+                                continue;
+                            }
 
                             Thread.Sleep(1);
-                            _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder,_securityClass);
+                            lock (_myServerLocker)
+                            {
+                                if (_myServer != null)
+                                {
+                                    _mySeries = _myServer.StartThisSecurity(_securityName, TimeFrameBuilder, _securityClass);
+                                }
+                            }
 
+                            OptimizerServer myOptimizerServer = _myServer as OptimizerServer;
                             if (_mySeries == null &&
-                                _myServer.ServerType == ServerType.Optimizer &&
-                                ((OptimizerServer)_myServer).NumberServer != ServerUid)
+                                myOptimizerServer != null &&
+                                myOptimizerServer.ServerType == ServerType.Optimizer &&
+                                myOptimizerServer.NumberServer != ServerUid)
                             {
                                 for (int i = 0; i < servers.Count; i++)
                                 {
@@ -1307,6 +1368,7 @@ namespace OsEngine.Market.Connectors
                 }
 
                 order.SecurityNameCode = SecurityName;
+                order.SecurityClassCode = SecurityClass;
                 order.PortfolioNumber = PortfolioName;
                 order.ServerType = ServerType;
                 order.TimeCreate = MarketTime;

@@ -37,7 +37,9 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
         /// </summary>
         public static List<BotManualControl> TabsToCheck = new List<BotManualControl>();
 
-        private static object _activatorLocker = new object();
+        private static string _tabsAddLocker = "tabsLocker";
+
+        private static string _activatorLocker = "activatorLocker";
 
         /// <summary>
         /// activate stream to view deals
@@ -92,25 +94,23 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
             _startProgram = startProgram;
 
             StopIsOn = false;
+            ProfitIsOn = false;
+            DoubleExitIsOn = true;
+            SecondToOpenIsOn = true;
+            SecondToCloseIsOn = true;
+            SetbackToOpenIsOn = false;
+            SetbackToCloseIsOn = false;
+
             StopDistance = 30;
             StopSlipage = 5;
-            ProfitIsOn = false;
+           
             ProfitDistance = 30;
             ProfitSlipage = 5;
-            DoubleExitIsOn = true;
+           
             DoubleExitSlipage = 10;
-
-            SecondToOpenIsOn = true;
             SecondToOpen = new TimeSpan(0, 0, 0, 50);
-
-            SecondToCloseIsOn = true;
             SecondToClose = new TimeSpan(0, 0, 0, 50);
-
-            SetbackToOpenIsOn = false;
-
             SetbackToOpenPosition = 10;
-
-            SetbackToCloseIsOn = false;
 
             SetbackToClosePosition = 10;
 
@@ -127,7 +127,12 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
                 {
                     Activate();
                 }
-                TabsToCheck.Add(this);
+
+                lock(_tabsAddLocker)
+                {
+                    TabsToCheck.Add(this);
+                }
+                
             }
         }
 
@@ -185,6 +190,11 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
         /// </summary>
         public void Save()
         {
+            if(_startProgram == StartProgram.IsOsOptimizer)
+            {
+                return;
+            }
+
             try
             {
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"StrategSettings.txt", false))
@@ -233,12 +243,29 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
                     File.Delete(@"Engine\" + _name + @"StrategSettings.txt");
                 }
 
-                TabsToCheck.Remove(this);
+                if(TabsToCheck != null)
+                {
+                    lock (_tabsAddLocker)
+                    {
+                        for (int i = 0; i < TabsToCheck.Count; i++)
+                        {
+                            if (TabsToCheck[i]._name == this._name)
+                            {
+                                TabsToCheck.RemoveAt(i);
+                                break;
+                            }
+                        }
+                    }
+                }
 
+                if(_botTab != null)
+                {
+                    _botTab = null;
+                }
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                // ignore
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
             }
         }
 
@@ -431,6 +458,11 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
 
             try
             {
+                if(_botTab == null)
+                {
+                    return;
+                }
+
                 List<Position> openDeals = _botTab.PositionsOpenAll;
 
                 if (openDeals == null)
@@ -728,6 +760,10 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
 
         private decimal GetMaxSpread(Order order)
         {
+            if (_botTab == null)
+            {
+                return 0;
+            }
             decimal maxSpread = 0;
 
             if (ValuesType == ManualControlValuesType.MinPriceStep)

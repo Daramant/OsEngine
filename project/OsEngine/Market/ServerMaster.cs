@@ -22,12 +22,10 @@ using OsEngine.Market.Servers.BitStamp;
 using OsEngine.Market.Servers.ExMo;
 using OsEngine.Market.Servers.Finam;
 using OsEngine.Market.Servers.GateIo;
-using OsEngine.Market.Servers.InteractivBrokers;
+using OsEngine.Market.Servers.InteractiveBrokers;
 using OsEngine.Market.Servers.Kraken;
-using OsEngine.Market.Servers.Livecoin;
 using OsEngine.Market.Servers.Lmax;
 using OsEngine.Market.Servers.NinjaTrader;
-using OsEngine.Market.Servers.Oanda;
 using OsEngine.Market.Servers.Optimizer;
 using OsEngine.Market.Servers.Plaza;
 using OsEngine.Market.Servers.Quik;
@@ -45,8 +43,8 @@ using OsEngine.Market.Servers.MOEX;
 using OsEngine.Market.Servers.Tinkoff;
 using MessageBox = System.Windows.MessageBox;
 using OsEngine.Market.Servers.GateIo.Futures;
-using OsEngine.Market.Servers.FTX;
 using OsEngine.Market.Servers.Bybit;
+using OsEngine.Market.Servers.OKX;
 
 namespace OsEngine.Market
 {
@@ -88,32 +86,120 @@ namespace OsEngine.Market
 
                 serverTypes.Add(ServerType.GateIo);
                 serverTypes.Add(ServerType.GateIoFutures);
-                serverTypes.Add(ServerType.BitMax);
+                serverTypes.Add(ServerType.AscendEx_BitMax);
                 serverTypes.Add(ServerType.Binance);
                 serverTypes.Add(ServerType.BinanceFutures);
                 serverTypes.Add(ServerType.BitMex);
                 serverTypes.Add(ServerType.BitStamp);
                 serverTypes.Add(ServerType.Bitfinex);
                 serverTypes.Add(ServerType.Kraken);
-                serverTypes.Add(ServerType.Livecoin);
                 serverTypes.Add(ServerType.Exmo);
                 serverTypes.Add(ServerType.Zb);
                 serverTypes.Add(ServerType.Hitbtc);
                 serverTypes.Add(ServerType.HuobiSpot);
                 serverTypes.Add(ServerType.HuobiFutures);
                 serverTypes.Add(ServerType.HuobiFuturesSwap);
-                serverTypes.Add(ServerType.FTX);
                 serverTypes.Add(ServerType.Bybit);
+                serverTypes.Add(ServerType.OKX);
 
-                serverTypes.Add(ServerType.InteractivBrokers);
+                serverTypes.Add(ServerType.InteractiveBrokers);
                 serverTypes.Add(ServerType.NinjaTrader);
                 serverTypes.Add(ServerType.Lmax);
-                serverTypes.Add(ServerType.Oanda);
 
                 serverTypes.Add(ServerType.AstsBridge);
 
+
+                // а теперь сортируем в зависимости от предпочтений пользователя
+
+                List<ServerPop> popularity = MostPopularServersWithCount();
+
+                for (int i = 0; i < popularity.Count; i++)
+                {
+                    for(int i2 = 0;i2 < serverTypes.Count;i2++)
+                    {
+                        if(serverTypes[i2] == popularity[i].ServerType)
+                        {
+                            serverTypes.RemoveAt(i2);
+                            i2--;
+                            break;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < popularity.Count; i++)
+                {
+                    if (popularity[i].ServerType == ServerType.Tester)
+                    {
+                        continue;
+                    }
+
+                    bool isInArray = false;
+
+                    for (int i2 = 0; i2 < serverTypes.Count; i2++)
+                    {
+                        if(serverTypes[i2].ToString() == popularity[i].ServerType.ToString())
+                        {
+                            isInArray = true;
+                            break;
+                        }
+                    }
+
+                    if(isInArray)
+                    {
+                        continue;
+                    }
+
+                    serverTypes.Insert(0, popularity[i].ServerType);
+                }
+
+                for (int i = 0; i < serverTypes.Count; i++)
+                {
+                    if(serverTypes[i].ToString() == "None")
+                    {
+                        serverTypes.RemoveAt(i);
+                        break;
+                    }
+                }
+
                 return serverTypes;
             }
+        }
+
+        /// <summary>
+        /// take trade server typre from system
+        /// взять типы торговых серверов в системе
+        /// </summary>
+        public static List<ServerType> ServersTypesToOsData
+        {
+            get
+            {
+                List<ServerType> serverTypes = new List<ServerType>();
+
+                serverTypes.Add(ServerType.Finam);
+                serverTypes.Add(ServerType.MoexDataServer);
+                serverTypes.Add(ServerType.MfdWeb);
+
+                serverTypes.Add(ServerType.AscendEx_BitMax);
+                serverTypes.Add(ServerType.Binance);
+                serverTypes.Add(ServerType.BinanceFutures);
+                serverTypes.Add(ServerType.BitMex);
+                serverTypes.Add(ServerType.BitStamp);
+                serverTypes.Add(ServerType.Bitfinex);
+                serverTypes.Add(ServerType.Kraken);
+                serverTypes.Add(ServerType.Exmo);
+                serverTypes.Add(ServerType.HuobiSpot);
+                serverTypes.Add(ServerType.HuobiFutures);
+                serverTypes.Add(ServerType.HuobiFuturesSwap);
+                serverTypes.Add(ServerType.Bybit);
+                serverTypes.Add(ServerType.OKX);
+
+                return serverTypes;
+            }
+        }
+
+        public static bool HasActiveServers()
+        {
+            return _servers != null && _servers.Count > 0;
         }
 
         public static List<ServerType> ActiveServersTypes
@@ -199,10 +285,12 @@ namespace OsEngine.Market
                     return;
                 }
 
+                SaveMostPopularServers(type);
+
                 IServer newServer = null;
-                if (type == ServerType.FTX)
+                if (type == ServerType.OKX)
                 {
-                    newServer = new FTXServer();
+                    newServer = new OkxServer();
                 }
                 if (type == ServerType.HuobiFuturesSwap)
                 {
@@ -252,11 +340,7 @@ namespace OsEngine.Market
                 {
                     newServer = new ExmoServer();
                 }
-                if (type == ServerType.Livecoin)
-                {
-                    newServer = new LivecoinServer();
-                }
-                if (type == ServerType.BitMax)
+                if (type == ServerType.AscendEx_BitMax)
                 {
                     newServer = new BitMaxProServer();
                 }
@@ -292,10 +376,6 @@ namespace OsEngine.Market
                 {
                     newServer = new KrakenServer();
                 }
-                if (type == ServerType.Oanda)
-                {
-                    newServer = new OandaServer();
-                }
                 if (type == ServerType.BitMex)
                 {
                     newServer = new BitMexServer();
@@ -308,7 +388,7 @@ namespace OsEngine.Market
                 {
                     newServer = new QuikServer();
                 }
-                if (type == ServerType.InteractivBrokers)
+                if (type == ServerType.InteractiveBrokers)
                 {
                     newServer = new InteractiveBrokersServer();
                 }
@@ -353,6 +433,127 @@ namespace OsEngine.Market
             }
         }
 
+        private static void SaveMostPopularServers(ServerType type)
+        {
+            List<ServerPop> servers = MostPopularServersWithCount();
+
+            bool isInArray = false;
+
+            for(int i = 0;i < servers.Count;i++)
+            {
+                if(servers[i].ServerType == type)
+                {
+                    servers[i].CountOfCreation += 1;
+                    isInArray = true;
+                    break;
+                }
+            }
+
+            if (isInArray == false)
+            {
+                ServerPop curServ = new ServerPop();
+                curServ.ServerType = type;
+                curServ.CountOfCreation = 1;
+                servers.Add(curServ);
+            }
+
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + @"MostPopularServers.txt", false))
+                {
+                    List<ServerType> alreadySaveServers = new List<ServerType>();
+
+                    for(int i = 0;i < servers.Count;i++)
+                    {
+                        bool isSaved = false;
+                        for(int i2 = 0; i2 < alreadySaveServers.Count;i2++)
+                        {
+                            if(alreadySaveServers[i2] == servers[i].ServerType)
+                            {
+                                isSaved = true;
+                                break;
+                            }
+                        }
+
+                        if(isSaved)
+                        {
+                            continue;
+                        }
+
+                        alreadySaveServers.Add(servers[i].ServerType);
+                        string saveStr = servers[i].ServerType + "&" + servers[i].CountOfCreation;
+                        writer.WriteLine(saveStr);
+                    }
+
+                    writer.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        public static List<ServerPop> MostPopularServersWithCount()
+        {
+            List<ServerPop> servers = new List<ServerPop>();
+
+            if (!File.Exists(@"Engine\" + @"MostPopularServers.txt"))
+            {
+                return servers;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + @"MostPopularServers.txt"))
+                {
+                    while(reader.EndOfStream == false)
+                    {
+                        string res = reader.ReadLine();
+
+                        if(res.Split('&').Length <= 1)
+                        {
+                            continue;
+                        }
+
+                        string[] saveInStr = res.Split('&');
+
+                        ServerPop curServ = new ServerPop();
+
+                        Enum.TryParse(saveInStr[0], out curServ.ServerType);
+                        curServ.CountOfCreation = Convert.ToInt32(saveInStr[1]);
+
+                        servers.Add(curServ);
+                    }
+
+                    reader.Close();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            if(servers.Count > 1)
+            {
+
+                for(int i = 0;i < servers.Count;i++)
+                {
+                    ServerPop curServ = servers[i];
+
+                    for(int i2 = i;i2 < servers.Count;i2++)
+                    {
+                        if(servers[i2].CountOfCreation < curServ.CountOfCreation)
+                        {
+                            servers[i] = servers[i2];
+                            servers[i2] = curServ;
+                        }
+                    }
+                }
+            }
+
+            return servers;
+        }
+
         private static object _optimizerGeneratorLocker = new object();
 
         /// <summary>
@@ -361,17 +562,18 @@ namespace OsEngine.Market
         /// </summary>
         public static OptimizerServer CreateNextOptimizerServer(OptimizerDataStorage storage, int num, decimal portfolioStartVal)
         {
+
+            OptimizerServer serv = new OptimizerServer(storage, num, portfolioStartVal);
+
+            if (serv == null)
+            {
+                return null;
+            }
+
+            bool isInArray = false;
+
             lock (_optimizerGeneratorLocker)
             {
-                OptimizerServer serv = new OptimizerServer(storage, num, portfolioStartVal);
-
-                if (serv == null)
-                {
-                    return null;
-                }
-
-                bool isInArray = false;
-
                 if (_servers == null)
                 {
                     _servers = new List<IServer>();
@@ -401,28 +603,29 @@ namespace OsEngine.Market
                     _servers.Add(serv);
                 }
 
-                if (ServerCreateEvent != null)
-                {
-                    ServerCreateEvent(serv);
-                }
                 return serv;
             }
         }
 
         public static void RemoveOptimizerServer(OptimizerServer server)
         {
-            for (int i = 0; _servers != null && i < _servers.Count; i++)
+            server.ClearDelete();
+
+            lock (_optimizerGeneratorLocker)
             {
-                if (_servers[i] == null)
+                for (int i = 0; _servers != null && i < _servers.Count; i++)
                 {
-                    _servers.RemoveAt(i);
-                    i--;
-                }
-                if (_servers[i].ServerType == ServerType.Optimizer &&
-                    ((OptimizerServer)_servers[i]).NumberServer == server.NumberServer)
-                {
-                    _servers.RemoveAt(i);
-                    break;
+                    if (_servers[i] == null)
+                    {
+                        _servers.RemoveAt(i);
+                        i--;
+                    }
+                    if (_servers[i].ServerType == ServerType.Optimizer &&
+                        ((OptimizerServer)_servers[i]).NumberServer == server.NumberServer)
+                    {
+                        _servers.RemoveAt(i);
+                        break;
+                    }
                 }
             }
         }
@@ -450,6 +653,19 @@ namespace OsEngine.Market
         {
             IServerPermission serverPermission = null;
 
+
+            if (type == ServerType.OKX)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new OkxServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
             if (type == ServerType.Binance)
             {
                 serverPermission = _serversPermissions.Find(s => s.ServerType == type);
@@ -607,7 +823,7 @@ namespace OsEngine.Market
 
                 return serverPermission;
             }
-            if (type == ServerType.InteractivBrokers)
+            if (type == ServerType.InteractiveBrokers)
             {
                 serverPermission = _serversPermissions.Find(s => s.ServerType == type);
 
@@ -712,13 +928,15 @@ namespace OsEngine.Market
                         return;
                     }
                 }
+
+                _needServerTypes.Add(type);
             }
-            catch
+            catch(Exception error)
             {
-                // ignore
+                LogMessageEvent(error.ToString(), LogMessageType.Error);
             }
 
-            _needServerTypes.Add(type);
+           
         }
 
         /// <summary>
@@ -897,6 +1115,13 @@ namespace OsEngine.Market
 
     }
 
+    public class ServerPop
+    {
+        public ServerType ServerType;
+
+        public int CountOfCreation;
+    }
+
     /// <summary>
     /// type of connection to trading. Server type
     /// тип подключения к торгам. Тип сервера
@@ -922,12 +1147,6 @@ namespace OsEngine.Market
         Hitbtc,
 
         /// <summary>
-        /// cryptocurrency exchange FTX
-        /// биржа криптовалют FTX
-        /// </summary>
-        FTX,
-
-        /// <summary>
         /// cryptocurrency exchange Gate.io
         /// биржа криптовалют Gate.io
         /// </summary>
@@ -946,16 +1165,10 @@ namespace OsEngine.Market
         Zb,
 
         /// <summary>
-        /// Livecoin exchange
-        /// биржа Livecoin
-        /// </summary>
-        Livecoin,
-
-        /// <summary>
         /// BitMax exchange
         /// биржа BitMax
         /// </summary>
-        BitMax,
+        AscendEx_BitMax,
 
         /// <summary>
         /// transaq
@@ -1004,12 +1217,6 @@ namespace OsEngine.Market
         /// биржа криптовалют Kraken
         /// </summary>
         Kraken,
-
-        /// <summary>
-        /// forex broker Oanda
-        /// форекс брокер Oanda
-        /// </summary>
-        Oanda,
 
         /// <summary>
         /// cryptocurrency exchange BitMEX
@@ -1068,7 +1275,7 @@ namespace OsEngine.Market
         /// <summary>
         /// IB
         /// </summary>
-        InteractivBrokers,
+        InteractiveBrokers,
 
         /// <summary>
         /// Finam
@@ -1110,6 +1317,12 @@ namespace OsEngine.Market
         /// <summary>
         /// Bybit exchange
         /// </summary>
-        Bybit
+        Bybit,
+
+        /// <summary>
+        /// OKX exchange
+        /// </summary>
+        OKX
+
     }
 }

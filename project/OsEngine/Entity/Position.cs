@@ -45,8 +45,24 @@ namespace OsEngine.Entity
             if (_openOrders == null)
             {
                 _openOrders = new List<Order>();
+                _openOrders.Add(openOrder);
             }
-            _openOrders.Add(openOrder);
+            else
+            {
+                if(string.IsNullOrEmpty(SecurityName) == false 
+                    && SecurityName.EndsWith("TestPaper") == false)
+                {
+                    if(SecurityName == openOrder.SecurityNameCode)
+                    {
+                        _openOrders.Add(openOrder);
+                    }
+                }
+                else
+                {
+                    _openOrders.Add(openOrder);
+                }
+
+            }
             
             State = PositionStateType.Opening;
         }
@@ -116,8 +132,23 @@ namespace OsEngine.Entity
             if (CloseOrders == null)
             {
                 _closeOrders = new List<Order>();
+                _closeOrders.Add(closeOrder);
             }
-            _closeOrders.Add(closeOrder);
+            else
+            {
+                if (string.IsNullOrEmpty(SecurityName) == false
+                    && SecurityName.EndsWith("TestPaper") == false)
+                {
+                    if(SecurityName == closeOrder.SecurityNameCode)
+                    {
+                        _closeOrders.Add(closeOrder);
+                    }
+                }
+                else
+                {
+                    _closeOrders.Add(closeOrder);
+                }
+            }
 
             State = PositionStateType.Closing;
         }
@@ -227,10 +258,6 @@ namespace OsEngine.Entity
             set
             {
                 _state = value;
-                if (value == PositionStateType.ClosingFail)
-                {
-                    
-                }
             }
         }
 
@@ -252,9 +279,18 @@ namespace OsEngine.Entity
                 {
                     return _openOrders[0].SecurityNameCode;
                 }
-                return "";
+                return _securityName;
+            }
+            set 
+            {
+                if (_openOrders != null && _openOrders.Count != 0)
+                {
+                    return;
+                }
+                _securityName = value; 
             }
         }
+        private string _securityName;
 
         /// <summary>
         /// name of the bot who owns the deal
@@ -405,7 +441,7 @@ namespace OsEngine.Entity
                 }
                 if (volume == 0)
                 {
-                    return 0;
+                    return _openOrders[0].Price;
                 }
 
                 return price/volume;
@@ -447,6 +483,8 @@ namespace OsEngine.Entity
             }
         }
 
+        public decimal MultToJournal = 100;
+
         /// <summary>
         /// check the incoming order for this transaction
         /// проверить входящий ордер, на принадлежность этой сделке
@@ -475,7 +513,11 @@ namespace OsEngine.Entity
 
             if (openOrder != null)
             {
-                openOrder.State = newOrder.State;
+               if (openOrder.State != OrderStateType.Done 
+                    || openOrder.Volume != openOrder.VolumeExecute)    //AVP 
+                {
+                    openOrder.State = newOrder.State;     //AVP 
+                }
                 openOrder.NumberMarket = newOrder.NumberMarket;
 
                 if (openOrder.TimeCallBack == DateTime.MinValue)
@@ -486,27 +528,33 @@ namespace OsEngine.Entity
                 openOrder.TimeCancel = newOrder.TimeCancel;
                 openOrder.VolumeExecute = newOrder.VolumeExecute;
 
-                if (openOrder.State == OrderStateType.Done && openOrder.TradesIsComing &&
-                    OpenVolume != 0 && !CloseActiv)
+                if (openOrder.State == OrderStateType.Done 
+                    && openOrder.TradesIsComing 
+                    && OpenVolume != 0 && !CloseActiv)
                 {
                     State = PositionStateType.Open;
                 }
-                else if (newOrder.State == OrderStateType.Fail && newOrder.VolumeExecute == 0 && 
-                    OpenVolume == 0)
+                else if (newOrder.State == OrderStateType.Fail 
+                    && newOrder.VolumeExecute == 0 
+                    && OpenVolume == 0)
                 {
                     State = PositionStateType.OpeningFail;
                 }
-                else if (newOrder.State == OrderStateType.Cancel && newOrder.VolumeExecute == 0 &&
-                    OpenVolume == 0)
+                else if (newOrder.State == OrderStateType.Cancel
+                    && newOrder.VolumeExecute == 0 
+                    && OpenVolume == 0)
                 {
                     State = PositionStateType.OpeningFail;
                 }
-                else if (newOrder.State == OrderStateType.Cancel && OpenVolume != 0)
+                else if (newOrder.State == OrderStateType.Cancel
+                    && OpenVolume != 0)
                 {
                     State = PositionStateType.Open;
                 }
-                else if (newOrder.State == OrderStateType.Done && OpenVolume == 0 
-                    && CloseOrders != null && CloseOrders.Count > 0)
+                else if (newOrder.State == OrderStateType.Done 
+                    && OpenVolume == 0 
+                    && CloseOrders != null 
+                    && CloseOrders.Count > 0)
                 {
                     State = PositionStateType.Done;
                 }
@@ -574,22 +622,27 @@ namespace OsEngine.Entity
 
                 if (State == PositionStateType.Done && CloseOrders != null)
                 {
-                    decimal entryPrice = EntryPrice;
-                    decimal closePrice = ClosePrice;
+                    CalculateProfitToPosition();
+                }
+            }
+        }
 
-                    if (entryPrice != 0 && closePrice != 0)
-                    {
-                        if (Direction == Side.Buy)
-                        {
-                            ProfitOperationPersent = closePrice / entryPrice * 100 - 100;
-                            ProfitOperationPunkt = closePrice - entryPrice;
-                        }
-                        else
-                        {
-                            ProfitOperationPunkt = entryPrice - closePrice;
-                            ProfitOperationPersent = -(closePrice / entryPrice * 100 - 100);
-                        }
-                    }
+        private void CalculateProfitToPosition()
+        {
+            decimal entryPrice = EntryPrice;
+            decimal closePrice = ClosePrice;
+
+            if (entryPrice != 0 && closePrice != 0)
+            {
+                if (Direction == Side.Buy)
+                {
+                    ProfitOperationPersent = closePrice / entryPrice * 100 - 100;
+                    ProfitOperationPunkt = closePrice - entryPrice;
+                }
+                else
+                {
+                    ProfitOperationPunkt = entryPrice - closePrice;
+                    ProfitOperationPersent = -(closePrice / entryPrice * 100 - 100);
                 }
             }
         }
@@ -606,8 +659,9 @@ namespace OsEngine.Entity
 
                 for (int i = 0; i < _openOrders.Count; i++)
                 {
-                    if (_openOrders[i].NumberMarket == trade.NumberOrderParent||
-                        _openOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
+                    if ((_openOrders[i].NumberMarket == trade.NumberOrderParent
+                        ||_openOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
+                        && _openOrders[i].SecurityNameCode == trade.SecurityNameCode)
                     {
                         trade.NumberPosition = Number.ToString();
                         _openOrders[i].SetTrade(trade);
@@ -628,8 +682,9 @@ namespace OsEngine.Entity
             {
                 for (int i = 0; i < CloseOrders.Count; i++)
                 {
-                    if (CloseOrders[i].NumberMarket == trade.NumberOrderParent ||
-                        CloseOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
+                    if ((CloseOrders[i].NumberMarket == trade.NumberOrderParent 
+                        || CloseOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
+                        && CloseOrders[i].SecurityNameCode == trade.SecurityNameCode)
                     {
                         trade.NumberPosition = Number.ToString();
                         CloseOrders[i].SetTrade(trade);
@@ -763,6 +818,8 @@ namespace OsEngine.Entity
                 }
             }
 
+            result.Append("#" + SecurityName);
+            
             return result;
         }
 
@@ -781,6 +838,11 @@ namespace OsEngine.Entity
             ProfitOperationPersent = arraySave[3].ToDecimal();
 
             ProfitOperationPunkt = arraySave[4].ToDecimal();
+
+            if(arraySave[5] == null)
+            {
+                return;
+            }
 
             if (arraySave[5] != "null")
             {
@@ -823,11 +885,20 @@ namespace OsEngine.Entity
             {
                 if (arraySave.Length > 22 + i)
                 {
+                    string saveOrd = arraySave[22 + i];
+
+                    if(saveOrd.Split('@').Length < 3)
+                    {
+                        continue;
+                    }
+
                     Order newOrder = new Order();
-                    newOrder.SetOrderFromString(arraySave[22 + i]);
+                    newOrder.SetOrderFromString(saveOrd);
                     AddNewCloseOrder(newOrder);
                 }
             }
+
+            SecurityName = arraySave[arraySave.Length - 1];
 
             PositionStateType state;
             Enum.TryParse(arraySave[1], true, out state);
@@ -842,13 +913,17 @@ namespace OsEngine.Entity
         {
             get
             {
-                if (_openOrders != null)
+                if (_timeCreate == DateTime.MinValue &&
+                    _openOrders != null)
                 {
-                    return _openOrders[0].GetLastTradeTime();
+                    _timeCreate = _openOrders[0].GetLastTradeTime();
                 }
-                return DateTime.MinValue;
+
+                return _timeCreate;
             }
         }
+
+        private DateTime _timeCreate;
 
         /// <summary>
         /// position closing time
@@ -941,7 +1016,7 @@ namespace OsEngine.Entity
 
         /// <summary>
         /// the amount of profit relative to the portfolio in absolute terms
-        /// количество прибыли относительно портфеля в абсолютном выражении
+        /// количество прибыли относительно портфеля в абсолютном выражении, С УЧЁТОМ КОМИССИИ И СТОИМОСТЕЙ ШАГА ЦЕНЫ
         /// </summary>
         public decimal ProfitPortfolioPunkt
         {
@@ -949,9 +1024,14 @@ namespace OsEngine.Entity
             {
                 decimal volume = 0;
 
-                for (int i = 0; i < _openOrders.Count; i++)
+                for (int i = 0; _openOrders != null && i < _openOrders.Count; i++)
                 {
                     volume += _openOrders[i].VolumeExecute;
+                }
+
+                if(PriceStepCost == 0)
+                {
+                    PriceStepCost = 1;
                 }
 
                 if (volume == 0 ||
@@ -966,13 +1046,22 @@ namespace OsEngine.Entity
                     Lots = 1;
                 }
 
+                if(ProfitOperationPunkt == 0)
+                {
+                    CalculateProfitToPosition();
+                }
+
                 if (IsLotServer())
                 {
                     return (ProfitOperationPunkt / PriceStep) * PriceStepCost * MaxVolume * Lots - CommissionTotal();
                 }
-                else
+                else if(PriceStep != 0)
                 {
                     return (ProfitOperationPunkt / PriceStep) * PriceStepCost * MaxVolume - CommissionTotal();
+                }
+                else
+                {
+                    return (ProfitOperationPunkt) * PriceStepCost * MaxVolume - CommissionTotal();
                 }
             }
         }

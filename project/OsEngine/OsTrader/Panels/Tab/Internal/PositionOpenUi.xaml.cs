@@ -23,7 +23,7 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
 
             TextBoxSecurity.Text = nameSecurity;
             TextBoxVolume.Text = "1";
-            TextBoxPrice.Text = lastPrice.ToString(new CultureInfo("ru-RU"));
+            TextBoxPrice.Text = lastPrice.ToStringWithNoEndZero();
             TextBoxAcebergOrdersCount.Text = "2";
 
             ComboBoxOrderType.Items.Add(PositionOpenType.Limit);
@@ -40,6 +40,9 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
             LabelOrdersToIceberg.Content = OsLocalization.Trader.Label104;
             ButtonAccept.Content = OsLocalization.Trader.Label17;
             LabelSide.Content = OsLocalization.Trader.Label106;
+
+            this.Activate();
+            this.Focus();
         }
 
         void ComboBoxOrderType_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -93,8 +96,8 @@ namespace OsEngine.OsTrader.Panels.Tab.Internal
 
             try
             {
-                Price = Convert.ToDecimal(TextBoxPrice.Text);
-                Volume = Convert.ToDecimal(TextBoxVolume.Text);
+                Price = TextBoxPrice.Text.ToDecimal();
+                Volume = TextBoxVolume.Text.ToDecimal();
 
                 if (Volume <= 0)
                 {

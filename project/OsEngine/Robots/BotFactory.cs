@@ -258,6 +258,11 @@ namespace OsEngine.Robots
                 bot = (BotPanel)Activator.CreateInstance(botType, name, startProgram);
             }
 
+            if (bot == null)
+            {
+                bot = CreateScriptStrategyByName(nameClass, name, startProgram);
+                return bot;
+            }
             return bot;
         }
 

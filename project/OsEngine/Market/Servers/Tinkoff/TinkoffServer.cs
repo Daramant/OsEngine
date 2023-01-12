@@ -18,8 +18,8 @@ namespace OsEngine.Market.Servers.Tinkoff
         {
             TinkoffServerRealization realization = new TinkoffServerRealization();
             ServerRealization = realization;
-
             CreateParameterString(OsLocalization.Market.ServerParamToken, "");
+            CreateParameterBoolean(OsLocalization.Market.ServerParamGrpcConnection, false);
         }
 
         /// <summary>
@@ -29,6 +29,11 @@ namespace OsEngine.Market.Servers.Tinkoff
         public List<Candle> GetCandleHistory(string nameSec, TimeFrame tf)
         {
             return ((TinkoffServerRealization)ServerRealization).GetCandleHistory(nameSec, tf);
+        }
+
+        public void UpDateCandleSeries(CandleSeries series)
+        {
+            ((TinkoffServerRealization)ServerRealization).UpDateCandleSeries(series);
         }
     }
 
@@ -101,7 +106,8 @@ namespace OsEngine.Market.Servers.Tinkoff
         {
             if (_client == null)
             {
-                _client = new TinkoffClient(((ServerParameterString)ServerParameters[0]).Value);
+                _client = new TinkoffClient(((ServerParameterString)ServerParameters[0]).Value,
+                    ((ServerParameterBool)ServerParameters[1]).Value);
                 _client.Connected += _client_Connected;
                 _client.UpdatePairs += _client_UpdatePairs;
                 _client.Disconnected += _client_Disconnected;
@@ -131,8 +137,7 @@ namespace OsEngine.Market.Servers.Tinkoff
         /// </summary>
         public void GetPortfolios()
         {
-            // _client.UpdBalance();
-            // _client.UpdPositions();
+            // Этот сервер берёт их автоматически, раз в N секунд
         }
 
         public List<Candle> GetCandleHistory(string nameSec, TimeFrame tf)
@@ -142,23 +147,72 @@ namespace OsEngine.Market.Servers.Tinkoff
 
             if (tf == TimeFrame.Min3 || tf == TimeFrame.Min5)
             {
-                from = DateTime.Now.AddDays(-3);
+                from = DateTime.Now.AddDays(-6);
             }
             if (tf == TimeFrame.Min10 || tf == TimeFrame.Min15)
             {
-                from = DateTime.Now.AddDays(-5);
+                from = DateTime.Now.AddDays(-10);
             }
-            if (tf == TimeFrame.Min20 || tf == TimeFrame.Min30)
+            if (tf == TimeFrame.Min20
+                || tf == TimeFrame.Min30
+                || tf == TimeFrame.Min45)
             {
-                from = DateTime.Now.AddDays(-8);
+                from = DateTime.Now.AddDays(-16);
             }
             if (tf == TimeFrame.Hour1)
             {
-                from = DateTime.Now.AddDays(-15);
+                from = DateTime.Now.AddDays(-30);
+            }
+            if (tf == TimeFrame.Hour2)
+            {
+                from = DateTime.Now.AddDays(-40);
+            }
+            if (tf == TimeFrame.Hour4)
+            {
+                from = DateTime.Now.AddDays(-50);
             }
             if (tf == TimeFrame.Day)
             {
-                from = DateTime.Now.AddDays(-50);
+                from = DateTime.Now.AddDays(-70);
+            }
+
+            return _client.GetCandleHistory(nameSec, tf, from, to);
+        }
+
+        private List<Candle> GetShortCandleHistory(string nameSec, TimeFrame tf)
+        {
+            DateTime to = DateTime.Now;
+            DateTime from = DateTime.Now.AddDays(-1);
+
+            if (tf == TimeFrame.Min3 || tf == TimeFrame.Min5)
+            {
+                from = DateTime.Now.AddDays(-1);
+            }
+            if (tf == TimeFrame.Min10 || tf == TimeFrame.Min15)
+            {
+                from = DateTime.Now.AddDays(-1);
+            }
+            if (tf == TimeFrame.Min20
+                || tf == TimeFrame.Min30
+                || tf == TimeFrame.Min45)
+            {
+                from = DateTime.Now.AddDays(-1);
+            }
+            if (tf == TimeFrame.Hour1)
+            {
+                from = DateTime.Now.AddDays(-1);
+            }
+            if (tf == TimeFrame.Hour2)
+            {
+                from = DateTime.Now.AddDays(-1);
+            }
+            if (tf == TimeFrame.Hour4)
+            {
+                from = DateTime.Now.AddDays(-2);
+            }
+            if (tf == TimeFrame.Day)
+            {
+                from = DateTime.Now.AddDays(-3);
             }
 
             return _client.GetCandleHistory(nameSec, tf, from, to);
@@ -183,12 +237,59 @@ namespace OsEngine.Market.Servers.Tinkoff
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
+        }
+
+        /// <summary>
         /// subscribe
         /// подписаться 
         /// </summary>
         public void Subscrible(Security security)
         {
-            _client.SubscribleDepths(security);
+            _client.SubscribleDepthsAndTrades(security);
+        }
+
+        public void UpDateCandleSeries(CandleSeries series)
+        {
+            List<Candle> actualCandles = series.CandlesAll;
+
+            if (actualCandles.Count < 2)
+            {
+                return;
+            }
+
+            List<Candle> newCandles = GetShortCandleHistory(series.Security.NameId, series.TimeFrameBuilder.TimeFrame);
+
+            if (newCandles == null
+                || newCandles.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = newCandles.Count - 1; i > 0 && i > newCandles.Count - 5; i--)
+            {
+                Candle newCandle = newCandles[i];
+
+                for (int i2 = actualCandles.Count - 1; i2 > 0 && i2 > actualCandles.Count - 10; i2--)
+                {
+                    Candle actualCandle = actualCandles[i2];
+
+                    if (newCandle.TimeStart == actualCandle.TimeStart)
+                    {
+                        actualCandle.High = newCandle.High;
+                        actualCandle.Low = newCandle.Low;
+                        actualCandle.Close = newCandle.Close;
+                        actualCandle.Open = newCandle.Open;
+                        actualCandle.Volume = newCandle.Volume;
+                        break;
+                    }
+                }
+            }
         }
 
         /// <summary>

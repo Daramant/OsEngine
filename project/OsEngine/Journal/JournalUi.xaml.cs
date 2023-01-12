@@ -27,6 +27,7 @@ using ChartArea = System.Windows.Forms.DataVisualization.Charting.ChartArea;
 using ContextMenu = System.Windows.Forms.ContextMenu;
 using MenuItem = System.Windows.Forms.MenuItem;
 using Series = System.Windows.Forms.DataVisualization.Charting.Series;
+using OsEngine.Layout;
 
 namespace OsEngine.Journal
 {
@@ -42,11 +43,11 @@ namespace OsEngine.Journal
         /// </summary>
         public bool IsErase;
 
-        /// <summary>
-        /// objects containing positions and robots
-        /// объекты содержащие позиции и роботов
-        /// </summary>
-        private List<BotPanelJournal> _botsJournals;
+        private List<Position> _allPositions;
+        private List<Position> _longPositions;
+        private List<Position> _shortPositions;
+        List<BotPanelJournal> _botsJournals;
+
 
         /// <summary>
         /// constructor
@@ -55,14 +56,9 @@ namespace OsEngine.Journal
         public JournalUi(List<BotPanelJournal> botsJournals,StartProgram startProgram)
         {
             _startProgram = startProgram;
-            InitializeComponent();
             _botsJournals = botsJournals;
-            TabControlCreateNameBots();
-            CreateTableToStatistic();
-            CreateChartProfit();
-            CreateChartVolume();
-            CreateChartDrowDown();
-            CreatPositionTables();
+            InitializeComponent();
+            _currentCulture = CultureInfo.CurrentCulture;
 
             TabBots.SizeChanged += TabBotsSizeChanged;
             TabControlPrime.SelectionChanged += TabControlPrime_SelectionChanged;
@@ -81,9 +77,176 @@ namespace OsEngine.Journal
             TabItem4.Header = OsLocalization.Journal.TabItem4;
             TabItem5.Header = OsLocalization.Journal.TabItem5;
             TabItem6.Header = OsLocalization.Journal.TabItem6;
-            
- 
+
+            CreatePositionsLists(botsJournals);
+            TabControlCreateNameBots();
+
             Closing += JournalUi_Closing;
+
+            this.Activate();
+            this.Focus();
+
+            string botNames = "";
+            for (int i = 0; i < botsJournals.Count; i++)
+            {
+                botNames += botsJournals[i].BotName;
+            }
+            GlobalGUILayout.Listen(this, "JournalUi_" + startProgram.ToString() + botNames);
+        }
+
+        private CultureInfo _currentCulture;
+
+        private void CreatePositionsLists(List<BotPanelJournal> _botsJournals)
+        {
+            if (TabControlLeft.SelectedItem == null)
+            {
+                return;
+            }
+
+            // 1 collecting all journals.
+            // 1 собираем все журналы
+            List<Journal> myJournals = new List<Journal>();
+
+            for (int i = 0; i < _botsJournals.Count; i++)
+            {
+                string name = ((TabItem)TabBots.SelectedItem).Header.ToString();
+                // 1 only take our bots
+                // 1 берём только нашего бота
+                if (name == "V" || name == _botsJournals[i].BotName)
+                {
+                    for (int i2 = 0; i2 < _botsJournals[i]._Tabs.Count; i2++)
+                    {
+                        string nameTab = ((TabItem)TabControlLeft.SelectedItem).Header.ToString().Replace(" ", "");
+                        // 2 only take our tabs
+                        // 2 берём только наши вкладки
+                        if (name == "V" || nameTab == "V" || nameTab == _botsJournals[i]._Tabs[i2].TabNum.ToString())
+                        {
+                            myJournals.Add(_botsJournals[i]._Tabs[i2].Journal);
+                        }
+                    }
+                }
+            }
+
+            if (myJournals.Count == 0)
+            {
+                return;
+            }
+            // 2 sorting deals on ALL / Long / Short
+            // 2 сортируем сделки на ВСЕ / Лонг / Шорт
+
+            List<Position> positionsAll = new List<Position>();
+            List<Position> positionsLong = new List<Position>();
+            List<Position> positionsShort = new List<Position>();
+
+            for (int i = 0; i < myJournals.Count; i++)
+            {
+                if (myJournals[i].AllPosition != null) positionsAll.AddRange(myJournals[i].AllPosition);
+                if (myJournals[i].CloseAllLongPositions != null)
+                    positionsLong.AddRange(myJournals[i].CloseAllLongPositions);
+                if (myJournals[i].CloseAllShortPositions != null)
+                    positionsShort.AddRange(myJournals[i].CloseAllShortPositions);
+            }
+
+            positionsLong =
+                positionsLong.FindAll(
+                    pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
+            positionsShort =
+                positionsShort.FindAll(
+                    pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
+            // 3 sort transactions by time (this is better in a separate method)
+            // 3 сортируем сделки по времени(это лучше в отдельном методе)
+
+
+            List<Position> newPositionsAll = new List<Position>();
+
+            for (int i = 0; i < positionsAll.Count; i++)
+            {
+                if (newPositionsAll.Count == 0 ||
+                    newPositionsAll[newPositionsAll.Count - 1].TimeCreate <= positionsAll[i].TimeCreate)
+                {
+                    newPositionsAll.Add(positionsAll[i]);
+                }
+                else if (newPositionsAll[0].TimeCreate >= positionsAll[i].TimeCreate)
+                {
+                    newPositionsAll.Insert(0, positionsAll[i]);
+                }
+                else
+                {
+                    for (int i2 = 0; i2 < newPositionsAll.Count - 1; i2++)
+                    {
+                        if (newPositionsAll[i2].TimeCreate <= positionsAll[i].TimeCreate &&
+                            newPositionsAll[i2 + 1].TimeCreate >= positionsAll[i].TimeCreate)
+                        {
+                            newPositionsAll.Insert(i2 + 1, positionsAll[i]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            positionsAll = newPositionsAll;
+
+            List<Position> newPositionsLong = new List<Position>();
+
+            for (int i = 0; i < positionsLong.Count; i++)
+            {
+                if (newPositionsLong.Count == 0 ||
+                    newPositionsLong[newPositionsLong.Count - 1].TimeCreate <= positionsLong[i].TimeCreate)
+                {
+                    newPositionsLong.Add(positionsLong[i]);
+                }
+                else if (newPositionsLong[0].TimeCreate > positionsLong[i].TimeCreate)
+                {
+                    newPositionsLong.Insert(0, positionsLong[i]);
+                }
+                else
+                {
+                    for (int i2 = 0; i2 < newPositionsLong.Count - 1; i2++)
+                    {
+                        if (newPositionsLong[i2].TimeCreate <= positionsLong[i].TimeCreate &&
+                            newPositionsLong[i2 + 1].TimeCreate >= positionsLong[i].TimeCreate)
+                        {
+                            newPositionsLong.Insert(i2 + 1, positionsLong[i]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            positionsLong = newPositionsLong;
+
+            List<Position> newPositionsShort = new List<Position>();
+
+            for (int i = 0; i < positionsShort.Count; i++)
+            {
+                if (newPositionsShort.Count == 0 ||
+                    newPositionsShort[newPositionsShort.Count - 1].TimeCreate <= positionsShort[i].TimeCreate)
+                {
+                    newPositionsShort.Add(positionsShort[i]);
+                }
+                else if (newPositionsShort[0].TimeCreate > positionsShort[i].TimeCreate)
+                {
+                    newPositionsShort.Insert(0, positionsShort[i]);
+                }
+                else
+                {
+                    for (int i2 = 0; i2 < newPositionsShort.Count - 1; i2++)
+                    {
+                        if (newPositionsShort[i2].TimeCreate <= positionsShort[i].TimeCreate &&
+                            newPositionsShort[i2 + 1].TimeCreate >= positionsShort[i].TimeCreate)
+                        {
+                            newPositionsShort.Insert(i2 + 1, positionsShort[i]);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            positionsShort = newPositionsShort;
+
+            _allPositions = positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail);
+            _longPositions = _allPositions.FindAll(p => p.Direction == Side.Buy);
+            _shortPositions = _allPositions.FindAll(p => p.Direction == Side.Sell);
 
         }
 
@@ -92,9 +255,102 @@ namespace OsEngine.Journal
             IsErase = true;
 
             TabBots.SizeChanged -= TabBotsSizeChanged;
+            TabBots.SelectionChanged -= TabBotsSelectionChanged;
+            TabBots.Items.Clear();
             TabControlPrime.SelectionChanged -= TabControlPrime_SelectionChanged;
-            _botsJournals = null;
+            TabControlPrime.Items.Clear();
+
             Closing -= JournalUi_Closing;
+            _botsJournals.Clear();
+            _botsJournals = null;
+
+            if (_allPositions != null)
+            {
+                _allPositions.Clear();
+                _allPositions = null;
+            }
+
+            if (_longPositions != null)
+            {
+                _longPositions.Clear();
+                _longPositions = null;
+            }
+
+            if (_shortPositions != null)
+            {
+                _shortPositions.Clear();
+                _shortPositions = null;
+            }
+
+            TabControlLeft.SelectionChanged -= TabControlLeftSelectionChanged;
+            TabControlLeft.Items.Clear();
+
+            if (_chartEquity != null)
+            {
+                _chartEquity.Series.Clear();
+                _chartEquity.ChartAreas.Clear();
+                _chartEquity.Click -= _chartEquity_Click;
+                _chartEquity = null;
+                HostEquity.Child.Hide();
+                HostEquity.Child = null;
+                HostEquity = null;
+            }
+
+            if (_chartVolume != null)
+            {
+                _chartVolume.Series.Clear();
+                _chartVolume.ChartAreas.Clear();
+                _chartVolume.Click -= _chartVolume_Click;
+                _chartVolume = null;
+                HostVolume.Child.Hide();
+                HostVolume.Child = null;
+                HostVolume = null;
+            }
+
+            if (_chartDd != null)
+            {
+                _chartDd.Series.Clear();
+                _chartDd.ChartAreas.Clear();
+                _chartDd.Click -= _chartDd_Click;
+                _chartDd = null;
+                HostDrawdown.Child.Hide();
+                HostDrawdown.Child = null;
+                HostDrawdown = null;
+            }
+
+            if (_gridStatistics != null)
+            {
+                DataGridFactory.ClearLinks(_gridStatistics);
+                _gridStatistics.Rows.Clear();
+                _gridStatistics = null;
+                HostStatistics.Child.Hide();
+                HostStatistics.Child = null;
+                HostStatistics = null;
+            }
+
+            if (_openPositionGrid != null)
+            {
+                DataGridFactory.ClearLinks(_openPositionGrid);
+                _openPositionGrid.Rows.Clear();
+                _openPositionGrid.Click -= _openPositionGrid_Click;
+                _openPositionGrid.DoubleClick -= _openPositionGrid_DoubleClick;
+                _openPositionGrid = null;
+                HostOpenPosition.Child.Hide();
+                HostOpenPosition.Child = null;
+                HostOpenPosition = null;
+            }
+
+            if (_closePositionGrid != null)
+            {
+                DataGridFactory.ClearLinks(_closePositionGrid);
+                _closePositionGrid.Rows.Clear();
+                _closePositionGrid.Click -= _closePositionGrid_Click;
+                _closePositionGrid.DoubleClick -= _closePositionGrid_DoubleClick;
+                _closePositionGrid = null;
+                HostClosePosition.Child.Hide();
+                HostClosePosition.Child = null;
+                HostClosePosition = null;
+            }
         }
 
         /// <summary>
@@ -129,183 +385,44 @@ namespace OsEngine.Journal
                 return;
             }
 
-            if (_botsJournals == null || _botsJournals.Count == 0) // TabBotsPrime.SelectedItem
+            if(IsErase == true)
             {
                 return;
             }
 
-            if (TabControlLeft.SelectedItem == null)
+            if(_allPositions == null)
             {
                 return;
             }
 
             lock (_paintLocker)
             {
-                // 1 collecting all journals.
-                // 1 собираем все журналы
-                List<Journal> myJournals = new List<Journal>();
-
-                for (int i = 0; i < _botsJournals.Count; i++)
-                {
-                    string name = ((TabItem)TabBots.SelectedItem).Header.ToString();
-                    // 1 only take our bots
-                    // 1 берём только нашего бота
-                    if (name == "V" || name == _botsJournals[i].BotName)
-                    {
-                        for (int i2 = 0; i2 < _botsJournals[i]._Tabs.Count; i2++)
-                        {
-                            string nameTab = ((TabItem)TabControlLeft.SelectedItem).Header.ToString().Replace(" ","");
-                            // 2 only take our tabs
-                            // 2 берём только наши вкладки
-                            if (name == "V" || nameTab == "V" || nameTab == _botsJournals[i]._Tabs[i2].TabNum.ToString())
-                            {
-                                myJournals.Add(_botsJournals[i]._Tabs[i2].Journal);
-                            }
-                        }
-                    }
-                }
-
-                if (myJournals.Count == 0)
-                {
-                    return;
-                }
-                // 2 sorting deals on ALL / Long / Short
-                // 2 сортируем сделки на ВСЕ / Лонг / Шорт
-
-                List<Position> positionsAll = new List<Position>();
-                List<Position> positionsLong = new List<Position>();
-                List<Position> positionsShort = new List<Position>();
-
-                for (int i = 0; i < myJournals.Count; i++)
-                {
-                    if (myJournals[i].AllPosition != null) positionsAll.AddRange(myJournals[i].AllPosition);
-                    if (myJournals[i].CloseAllLongPositions != null)
-                        positionsLong.AddRange(myJournals[i].CloseAllLongPositions);
-                    if (myJournals[i].CloseAllShortPositions != null)
-                        positionsShort.AddRange(myJournals[i].CloseAllShortPositions);
-                }
-
-                positionsLong =
-                    positionsLong.FindAll(
-                        pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
-                positionsShort =
-                    positionsShort.FindAll(
-                        pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
-                // 3 sort transactions by time (this is better in a separate method)
-                // 3 сортируем сделки по времени(это лучше в отдельном методе)
-
-
-                List<Position> newPositionsAll = new List<Position>();
-
-                for (int i = 0; i < positionsAll.Count; i++)
-                {
-                    if (newPositionsAll.Count == 0 ||
-                        newPositionsAll[newPositionsAll.Count - 1].TimeCreate <= positionsAll[i].TimeCreate)
-                    {
-                        newPositionsAll.Add(positionsAll[i]);
-                    }
-                    else if (newPositionsAll[0].TimeCreate >= positionsAll[i].TimeCreate)
-                    {
-                        newPositionsAll.Insert(0, positionsAll[i]);
-                    }
-                    else 
-                    {
-                        for (int i2 = 0; i2 < newPositionsAll.Count-1; i2++)
-                        {
-                            if (newPositionsAll[i2].TimeCreate <= positionsAll[i].TimeCreate &&
-                                newPositionsAll[i2 + 1].TimeCreate >= positionsAll[i].TimeCreate)
-                            {
-                                newPositionsAll.Insert(i2 + 1, positionsAll[i]);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                positionsAll = newPositionsAll;
-
-                List<Position> newPositionsLong = new List<Position>();
-
-                for (int i = 0; i < positionsLong.Count; i++)
-                {
-                    if (newPositionsLong.Count == 0 ||
-                        newPositionsLong[newPositionsLong.Count - 1].TimeCreate <= positionsLong[i].TimeCreate)
-                    {
-                        newPositionsLong.Add(positionsLong[i]);
-                    }
-                    else if (newPositionsLong[0].TimeCreate > positionsLong[i].TimeCreate)
-                    {
-                        newPositionsLong.Insert(0, positionsLong[i]);
-                    }
-                    else
-                    {
-                        for (int i2 = 0; i2 < newPositionsLong.Count-1; i2++)
-                        {
-                            if (newPositionsLong[i2].TimeCreate <= positionsLong[i].TimeCreate &&
-                                newPositionsLong[i2 + 1].TimeCreate >= positionsLong[i].TimeCreate)
-                            {
-                                newPositionsLong.Insert(i2 + 1, positionsLong[i]);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                positionsLong = newPositionsLong;
-
-                List<Position> newPositionsShort = new List<Position>();
-
-                for (int i = 0; i < positionsShort.Count; i++)
-                {
-                    if (newPositionsShort.Count == 0 ||
-                        newPositionsShort[newPositionsShort.Count - 1].TimeCreate <= positionsShort[i].TimeCreate)
-                    {
-                        newPositionsShort.Add(positionsShort[i]);
-                    }
-                    else if (newPositionsShort[0].TimeCreate > positionsShort[i].TimeCreate)
-                    {
-                        newPositionsShort.Insert(0, positionsShort[i]);
-                    }
-                    else
-                    {
-                        for (int i2 = 0; i2 < newPositionsShort.Count-1; i2++)
-                        {
-                            if (newPositionsShort[i2].TimeCreate <= positionsShort[i].TimeCreate &&
-                                newPositionsShort[i2 + 1].TimeCreate >= positionsShort[i].TimeCreate)
-                            {
-                                newPositionsShort.Insert(i2 + 1, positionsShort[i]);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                positionsShort = newPositionsShort;
 
                 if (TabControlPrime.SelectedIndex == 0)
                 {
-                    PaintProfitOnChart(positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail));
+                    PaintProfitOnChart(_allPositions);
                 }
                 else if (TabControlPrime.SelectedIndex == 1)
                 {
-                    bool neadShowTickState = !(myJournals.Count > 1);
-                    PaintStatTable(positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail), positionsLong, positionsShort, neadShowTickState);
+                    bool neadShowTickState = !(_botsJournals.Count > 1);
+
+                    PaintStatTable(_allPositions, _longPositions, _shortPositions, neadShowTickState);
                 }
                 else if (TabControlPrime.SelectedIndex == 2)
                 {
-                    PaintDrowDown(positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail));
+                    PaintDrowDown(_allPositions);
                 }
                 else if (TabControlPrime.SelectedIndex == 3)
                 {
-                    PaintVolumeOnChart(positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail));
+                    PaintVolumeOnChart(_allPositions);
                 }
                 else if (TabControlPrime.SelectedIndex == 4)
                 {
-                    PaintOpenPositionGrid(positionsAll);
+                    PaintOpenPositionGrid(_allPositions);
                 }
                 else if (TabControlPrime.SelectedIndex == 5)
                 {
-                    PaintClosePositionGrid(positionsAll);
+                    PaintClosePositionGrid(_allPositions);
                 }
             }
         }
@@ -353,8 +470,15 @@ namespace OsEngine.Journal
 
                     if (pos != null)
                     {
-                        PositionUi ui = new PositionUi(pos);
+                        PositionUi ui = new PositionUi(pos,_startProgram);
                         ui.ShowDialog();
+
+                        if(ui.PositionChanged)
+                        {
+                            _botsJournals[i]._Tabs[i2].Journal.Save();
+                            _botsJournals[i]._Tabs[i2].Journal.NeadToUpdateStatePositions();
+                            RePaint();
+                        }
                         return;
                     }
                 }
@@ -418,6 +542,7 @@ namespace OsEngine.Journal
         private void TabBotsSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ReloadTabs();
+            CreatePositionsLists(_botsJournals);
             RePaint();
         }
 
@@ -442,6 +567,13 @@ namespace OsEngine.Journal
             {
                 for (int i = 0; i < _botsJournals.Count; i++)
                 {
+                    if (TabBots == null ||
+                        TabBots.Items == null
+                        || TabBots.Items.Count <= i)
+                    {
+                        continue;
+                    }
+
                     if (((TabItem)TabBots.Items[TabBots.SelectedIndex]).Header.ToString() ==
                         _botsJournals[i].BotName)
                     {
@@ -469,7 +601,6 @@ namespace OsEngine.Journal
                 }
 
                 TabControlLeft.SelectionChanged += TabControlLeftSelectionChanged;
-
             }
         }
 
@@ -547,7 +678,7 @@ namespace OsEngine.Journal
                 column3.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
                 _gridStatistics.Columns.Add(column3);
 
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows.Add(); //string addition/ добавление строки
                 }
@@ -555,33 +686,34 @@ namespace OsEngine.Journal
                 _gridStatistics.Rows[0].Cells[0].Value = OsLocalization.Journal.GridRow1;
                 _gridStatistics.Rows[1].Cells[0].Value = OsLocalization.Journal.GridRow2;
                 _gridStatistics.Rows[2].Cells[0].Value = OsLocalization.Journal.GridRow3;
-                _gridStatistics.Rows[3].Cells[0].Value = OsLocalization.Journal.GridRow4;
-                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow5;
+                _gridStatistics.Rows[3].Cells[0].Value = OsLocalization.Journal.GridRow17;
+                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow4;
+                _gridStatistics.Rows[5].Cells[0].Value = OsLocalization.Journal.GridRow5;
 
-                _gridStatistics.Rows[6].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[7].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[7].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[10].Cells[0].Value = OsLocalization.Journal.GridRow9;
 
 
-                _gridStatistics.Rows[11].Cells[0].Value = OsLocalization.Journal.GridRow10;
-                _gridStatistics.Rows[12].Cells[0].Value = OsLocalization.Journal.GridRow11;
-                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[12].Cells[0].Value = OsLocalization.Journal.GridRow10;
+                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow11;
+                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[18].Cells[0].Value = OsLocalization.Journal.GridRow12;
 
-                _gridStatistics.Rows[19].Cells[0].Value = OsLocalization.Journal.GridRow13;
-                _gridStatistics.Rows[20].Cells[0].Value = OsLocalization.Journal.GridRow14;
-                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow12;
-                _gridStatistics.Rows[26].Cells[0].Value = "";
-                _gridStatistics.Rows[27].Cells[0].Value = OsLocalization.Journal.GridRow15;
-                _gridStatistics.Rows[28].Cells[0].Value = OsLocalization.Journal.GridRow16;
+                _gridStatistics.Rows[20].Cells[0].Value = OsLocalization.Journal.GridRow13;
+                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow14;
+                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[26].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[27].Cells[0].Value = "";
+                _gridStatistics.Rows[28].Cells[0].Value = OsLocalization.Journal.GridRow15;
+                _gridStatistics.Rows[29].Cells[0].Value = OsLocalization.Journal.GridRow16;
             }
             catch (Exception error)
             {
@@ -595,48 +727,53 @@ namespace OsEngine.Journal
         /// </summary>
         private void PaintStatTable(List<Position> positionsAll, List<Position> positionsLong, List<Position> positionsShort, bool neadShowTickState)
         {
-            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll, neadShowTickState);
-            List<string> positionsLongState = PositionStaticticGenerator.GetStatisticNew(positionsLong, neadShowTickState);
-            List<string> positionsShortState = PositionStaticticGenerator.GetStatisticNew(positionsShort, neadShowTickState);
+            if(_gridStatistics == null)
+            {
+                CreateTableToStatistic();
+            }
+
+            List<string> positionsAllState = PositionStaticticGenerator.GetStatisticNew(positionsAll);
+            List<string> positionsLongState = PositionStaticticGenerator.GetStatisticNew(positionsLong);
+            List<string> positionsShortState = PositionStaticticGenerator.GetStatisticNew(positionsShort);
 
             if (positionsAllState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = "";
                 }
             }
             if (positionsLongState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = "";
                 }
             }
             if (positionsShortState == null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = "";
                 }
             }
             if (positionsLongState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = positionsLongState[i].ToString();
                 }
             }
             if (positionsShortState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = positionsShortState[i].ToString();
                 }
             }
             if (positionsAllState != null)
             {
-                for (int i = 0; i < 29; i++)
+                for (int i = 0; i < 30; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = positionsAllState[i].ToString();
                 }
@@ -722,6 +859,11 @@ namespace OsEngine.Journal
                 return;
             }
 
+            if(_chartEquity == null)
+            {
+                CreateChartProfit();
+            }
+
             _chartEquity.Series.Clear();
 
             Series profit = new Series("SeriesProfit");
@@ -782,7 +924,7 @@ namespace OsEngine.Journal
 
 
                     profit.Points[profit.Points.Count - 1].AxisLabel =
-                        positionsAll[i].TimeCreate.ToString(new CultureInfo("ru-RU"));
+                        positionsAll[i].TimeCreate.ToString(_currentCulture);
 
                     profitBar.Points.AddXY(i, positionsAll[i].ProfitPortfolioPunkt);
 
@@ -850,6 +992,10 @@ namespace OsEngine.Journal
                 if (minYval != decimal.MaxValue &&
                     maxYVal != 0)
                 {
+                    decimal chartHeigh = maxYVal - minYval;
+
+                    maxYVal = maxYVal + chartHeigh * 0.05m;
+                    minYval = minYval - chartHeigh * 0.05m;
                     _chartEquity.ChartAreas[0].AxisY2.Maximum = (double)maxYVal;
                     _chartEquity.ChartAreas[0].AxisY2.Minimum = (double)minYval;
                 }
@@ -952,6 +1098,11 @@ namespace OsEngine.Journal
                 TabBots.Dispatcher.Invoke(
                     new Action<List<Position>>(PaintVolumeOnChart), positionsAll);
                 return;
+            }
+
+            if(_chartVolume == null)
+            {
+                CreateChartVolume();
             }
 
             _chartVolume.Series.Clear();
@@ -1151,7 +1302,7 @@ namespace OsEngine.Journal
                 }
                 volumeSeries.Points.Add(Convert.ToDouble(volume[i]));
                 volumeSeries.Points[volumeSeries.Points.Count - 1].AxisLabel =
-                times[i].ToString(new CultureInfo("ru-RU"));
+                times[i].ToString(_currentCulture);
             }
 
             _chartVolume.Series.Add(volumeSeries);
@@ -1316,6 +1467,11 @@ namespace OsEngine.Journal
         /// <param name="positionsAll"></param>
         private void PaintDrowDown(List<Position> positionsAll)
         {
+            if(_chartDd == null)
+            {
+                CreateChartDrowDown();
+            }
+
              _chartDd.Series.Clear();
 
             if (positionsAll.Count == 0)
@@ -1354,7 +1510,7 @@ namespace OsEngine.Journal
             {
                 drowDownPunct.Points.Add(Convert.ToDouble(ddPunct[i]));
                 drowDownPunct.Points[drowDownPunct.Points.Count - 1].AxisLabel =
-               positionsAll[i].TimeCreate.ToString(new CultureInfo("ru-RU"));
+               positionsAll[i].TimeCreate.ToString(_currentCulture);
             }
 
             _chartDd.Series.Add(drowDownPunct);
@@ -1392,7 +1548,7 @@ namespace OsEngine.Journal
             {
                 drowDownPersent.Points.Add(Convert.ToDouble(ddPepcent[i]));
                 drowDownPersent.Points[drowDownPersent.Points.Count - 1].AxisLabel =
-               positionsAll[i].TimeCreate.ToString(new CultureInfo("ru-RU"));
+               positionsAll[i].TimeCreate.ToString(_currentCulture);
             }
 
             _chartDd.Series.Add(drowDownPersent);
@@ -1465,23 +1621,6 @@ namespace OsEngine.Journal
         private DataGridView _closePositionGrid;
 
         /// <summary>
-        /// create tables for positions
-        /// создать таблицы для позиций
-        /// </summary>
-        private void CreatPositionTables()
-        {
-            _openPositionGrid = CreateNewTable();
-            HostOpenPosition.Child = _openPositionGrid;
-            _openPositionGrid.Click += _openPositionGrid_Click;
-            _openPositionGrid.DoubleClick += _openPositionGrid_DoubleClick;
-
-            _closePositionGrid = CreateNewTable();
-            HostClosePosition.Child = _closePositionGrid;
-            _closePositionGrid.Click += _closePositionGrid_Click;
-            _closePositionGrid.DoubleClick += _closePositionGrid_DoubleClick;
-        }
-
-        /// <summary>
         /// create a table
         /// создать таблицу
         /// </summary>
@@ -1491,6 +1630,7 @@ namespace OsEngine.Journal
             try
             {
                 DataGridView newGrid = DataGridFactory.GetDataGridPosition();
+                newGrid.ScrollBars = ScrollBars.Vertical;
 
                 return newGrid;
             }
@@ -1637,18 +1777,31 @@ namespace OsEngine.Journal
 
             try
             {
-                MenuItem[] items = new MenuItem[3];
+                List<MenuItem> items = new List<MenuItem>();
 
-                items[0] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem8 };
+                items.Add(new MenuItem { Text = OsLocalization.Journal.PositionMenuItem8 });
                 items[0].Click += OpenDealMoreInfo_Click;
 
-                items[1] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem9 };
+                items.Add(new MenuItem { Text = OsLocalization.Journal.PositionMenuItem9 });
                 items[1].Click += OpenDealDelete_Click;
 
-                items[2] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem10 };
+                items.Add(new MenuItem { Text = OsLocalization.Journal.PositionMenuItem10 });
                 items[2].Click += OpenDealClearAll_Click;
 
-                ContextMenu menu = new ContextMenu(items);
+                if(_botsJournals.Count != 0)
+                {
+                    List<MenuItem> itemsBots = new List<MenuItem>();
+
+                    for(int i = 0;i < _botsJournals.Count;i++)
+                    {
+                        itemsBots.Add(new MenuItem { Text = _botsJournals[i].BotName });
+                        itemsBots[i].Click += OpenDealCreatePosition_Click;
+                    }
+
+                    items.Add(new MenuItem(OsLocalization.Journal.PositionMenuItem13, itemsBots.ToArray()));
+                }
+
+                ContextMenu menu = new ContextMenu(items.ToArray());
 
                 _openPositionGrid.ContextMenu = menu;
                 _openPositionGrid.ContextMenu.Show(_openPositionGrid, new System.Drawing.Point(mouse.X, mouse.Y));
@@ -1699,6 +1852,14 @@ namespace OsEngine.Journal
                 return;
             }
 
+            AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message3);
+            ui.ShowDialog();
+
+            if (ui.UserAcceptActioin == false)
+            {
+                return;
+            }
+
             DeletePosition(number);
 
             RePaint();
@@ -1724,6 +1885,14 @@ namespace OsEngine.Journal
                 return;
             }
 
+            AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message4);
+            ui.ShowDialog();
+
+            if (ui.UserAcceptActioin == false)
+            {
+                return;
+            }
+
             for (int i = 0; i < numbers.Count; i++)
             {
                 DeletePosition(numbers[i]);
@@ -1732,11 +1901,47 @@ namespace OsEngine.Journal
         }
 
         /// <summary>
+        /// создать новую позицию
+        /// </summary>
+        void OpenDealCreatePosition_Click(object sender, EventArgs e)
+        {
+            if(_botsJournals == null ||
+                _botsJournals.Count == 0)
+            {
+                return;
+            }
+
+            int number = ((MenuItem)sender).Index;
+
+            string botName = _botsJournals[number].BotName;
+
+            Position newPos = new Position();
+
+            newPos.Number = NumberGen.GetNumberDeal(_startProgram);
+            newPos.NameBot = botName;
+            _botsJournals[number]._Tabs[0].Journal.SetNewDeal(newPos);
+
+            RePaint();
+        }
+
+        private void CreateOpenPositionTable()
+        {
+            _openPositionGrid = CreateNewTable();
+            HostOpenPosition.Child = _openPositionGrid;
+            _openPositionGrid.Click += _openPositionGrid_Click;
+            _openPositionGrid.DoubleClick += _openPositionGrid_DoubleClick;
+        }
+
+        /// <summary>
         /// Draw open positions on the table
         /// прорисовать открытые позиции на таблице
         /// </summary>
         private void PaintOpenPositionGrid(List<Position> positionsAll)
         {
+            if(_openPositionGrid == null)
+            {
+                CreateOpenPositionTable();
+            }
             _openPositionGrid.Rows.Clear();
 
             for (int i = 0; i < positionsAll.Count; i++)
@@ -1930,6 +2135,14 @@ namespace OsEngine.Journal
                 return;
             }
 
+            AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message3);
+            ui.ShowDialog();
+
+            if (ui.UserAcceptActioin == false)
+            {
+                return;
+            }
+
             DeletePosition(number);
 
             RePaint();
@@ -1969,11 +2182,28 @@ namespace OsEngine.Journal
                 return;
             }
 
+            AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message4);
+            ui.ShowDialog();
+
+            if (ui.UserAcceptActioin == false)
+            {
+                return;
+            }
+
             for (int i = 0; i < numbers.Count; i++)
             {
                 DeletePosition(numbers[i]);
             }
             RePaint();
+        }
+
+        private void CreateClosePositionTable()
+        {
+
+            _closePositionGrid = CreateNewTable();
+            HostClosePosition.Child = _closePositionGrid;
+            _closePositionGrid.Click += _closePositionGrid_Click;
+            _closePositionGrid.DoubleClick += _closePositionGrid_DoubleClick;
         }
 
         /// <summary>
@@ -1982,6 +2212,10 @@ namespace OsEngine.Journal
         /// </summary>
         private void PaintClosePositionGrid(List<Position> positionsAll)
         {
+            if (_closePositionGrid == null)
+            {
+                CreateClosePositionTable();
+            }
             _closePositionGrid.Rows.Clear();
 
             if(positionsAll.Count == 0)
@@ -2045,43 +2279,6 @@ namespace OsEngine.Journal
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
-    }
-
-    /// <summary>
-    /// log storage class
-    /// класс хранилище журналов
-    /// </summary>
-    public class BotPanelJournal
-    {
-        public string BotName;
-
-        public List<BotTabJournal> _Tabs;
-
-        public List<Position> AllPositions
-        {
-            get
-            {
-                List<Position> poses = new List<Position>();
-
-                for(int i = 0;i < _Tabs.Count;i++)
-                {
-                    poses.AddRange(_Tabs[i].Journal.AllPosition);
-                }
-
-                return poses;
-            }
-        }
-    }
-
-    /// <summary>
-    /// log storage class
-    /// класс хранилище журналов
-    /// </summary>
-    public class BotTabJournal
-    {
-        public int TabNum;
-
-        public Journal Journal;
     }
 
     /// <summary>

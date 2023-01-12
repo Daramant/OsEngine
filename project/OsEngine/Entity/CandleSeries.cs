@@ -19,7 +19,6 @@ namespace OsEngine.Entity
     /// </summary>
     public class CandleSeries
     {
-        // service
         // сервис
 
         /// <summary>
@@ -34,7 +33,11 @@ namespace OsEngine.Entity
             TimeFrameBuilder = timeFrameBuilder;
             Security = security;
             _startProgram = startProgram;
+
+            UID = Guid.NewGuid();
         }
+
+        public Guid UID;
 
         /// <summary>
         /// blocking empty constructor
@@ -72,15 +75,8 @@ namespace OsEngine.Entity
         {
             get
             {
-                StringBuilder result = new StringBuilder();
-
-                string _specification = "";
-
-                result.Append(Security.NameFull + "_");
-                //result.Append(Security.NameClass + "_");
-                result.Append(TimeFrameBuilder.Specification);
-
-                _specification = result.ToString();
+                string _specification 
+                    = Security.NameFull + "_" + TimeFrameBuilder.Specification;
 
                 _specification =
                     _specification.Replace("(", "")
@@ -186,13 +182,11 @@ namespace OsEngine.Entity
         {
             _lastTradeIndex = 0;
 
-            for (int i = 0; CandlesAll != null && i < CandlesAll.Count; i++)
+            if(CandlesAll != null)
             {
-                CandlesAll[i].Trades = null;
+                CandlesAll.Clear();
+                CandlesAll = null;
             }
-
-            CandlesAll = null;
-            
         }
 
         // приём изменившегося времени
@@ -247,6 +241,8 @@ namespace OsEngine.Entity
         /// </summary>
         private int _lastTradeIndex;
 
+        private DateTime _lastTradeTime;
+
         /// <summary>
         /// добавить в серию новые тики
         /// </summary>
@@ -270,20 +266,94 @@ namespace OsEngine.Entity
                 return;
             }
 
-            if (_lastTradeIndex >= trades.Count)
+            try
+            {
+                Trade lastTrade = trades[trades.Count - 1];
+
+                if(lastTrade == null)
+                {
+                    return;
+                }
+
+                if (_lastTradeTime >= lastTrade.Time)
+                {
+                    return;
+                }
+            }
+            catch
             {
                 return;
             }
 
-            if (_lastTradeIndex == 0)
-            {
+            List<Trade> newTrades = new List<Trade>();
 
+
+            if (trades.Count > 1000)
+            { // если удаление трейдов из системы выключено
+
+                int newTradesCount = trades.Count - _lastTradeIndex;
+
+                if (newTradesCount <= 0)
+                {
+                    return;
+                }
+
+                newTrades = trades.GetRange(_lastTradeIndex, newTradesCount);
+            }
+            else
+            {
+                if (_lastTradeTime == DateTime.MinValue)
+                {
+                    newTrades = trades;
+                }
+                else
+                {
+                    for (int i = 0; i < trades.Count; i++)
+                    {
+                        try
+                        {
+                            if (trades[i] == null)
+                            {
+                                continue;
+                            }
+                            if (trades[i].Time <= _lastTradeTime)
+                            {
+                                continue;
+                            }
+                            newTrades.Add(trades[i]);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            if(newTrades.Count == 0)
+            {
+                return;
+            }
+
+            for (int i2 = 0; i2 < newTrades.Count; i2++)
+            {
+                if (newTrades[i2] == null)
+                {
+                    newTrades.RemoveAt(i2);
+                    i2--;
+                    continue;
+                }
+            }
+
+            if (newTrades != null && newTrades.Count > 0)
+            {
+                _lastTradeTime = newTrades[newTrades.Count - 1].Time;
             }
 
             // обновилось неизвесное кол-во тиков
-            for (int i = _lastTradeIndex; i < trades.Count; i++)
+            for (int i = 0; i < newTrades.Count; i++)
             {
-                Trade trade = trades[i];
+                Trade trade = newTrades[i];
 
                 if (trade == null)
                 {

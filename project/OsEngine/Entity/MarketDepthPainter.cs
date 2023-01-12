@@ -103,12 +103,14 @@ namespace OsEngine.Entity
                 if (MarketDepthsToCheck[i] == null ||
                     MarketDepthsToCheck[i]._name == _name)
                 {
-                    _glassBox = null;
-                    _hostGlass = null;
+
                     MarketDepthsToCheck.RemoveAt(i);
                     return;
                 }
             }
+
+            _glassBox = null;
+            _hostGlass = null;
         }
 
         /// <summary>
@@ -198,7 +200,6 @@ namespace OsEngine.Entity
                 styleRed.Alignment = DataGridViewContentAlignment.MiddleRight;
                 styleRed.ForeColor = Color.FromArgb(254, 84, 0);
                 styleRed.Font = new Font("Areal", 3);
-
 
                 for (int i = 0; i < 25; i++)
                 {
@@ -380,6 +381,8 @@ namespace OsEngine.Entity
 
                 if(_glassBox != null)
                 {
+
+                    _glassBox.SelectionChanged -= _glassBox_SelectionChanged;
                     _glassBox.Rows.Clear();
                     _glassBox = null;
                 }

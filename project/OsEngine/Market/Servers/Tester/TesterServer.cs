@@ -62,7 +62,7 @@ namespace OsEngine.Market.Servers.Tester
                 _worker.Start();
             }
 
-            _candleManager = new CandleManager(this);
+            _candleManager = new CandleManager(this,StartProgram.IsTester);
             _candleManager.CandleUpdateEvent += _candleManager_CandleUpdateEvent;
             _candleManager.LogMessageEvent += SendLogMessage;
             _candleManager.TypeTesterData = TypeTesterData;
@@ -331,8 +331,14 @@ namespace OsEngine.Market.Servers.Tester
         /// </summary>
         public void TestingStart()
         {
+            if (_lastStartSecurityTime.AddSeconds(5) > DateTime.Now)
+            {
+                SendLogMessage(OsLocalization.Market.Message97, LogMessageType.Error);
+                return;
+            }
+
             TesterRegime = TesterRegime.Pause;
-            Thread.Sleep(2000);
+            Thread.Sleep(200);
             _serverTime = DateTime.MinValue;
 
             ServerMaster.ClearOrders();
@@ -355,7 +361,8 @@ namespace OsEngine.Market.Servers.Tester
                 NeadToReconnectEvent();
             }
 
-            Thread.Sleep(5000);
+            Thread.Sleep(200);
+
             _candleManager.Clear();
 
             _allTrades = null;
@@ -982,15 +989,16 @@ namespace OsEngine.Market.Servers.Tester
                         }
                     }
 
+                    if (_portfolios.Count == 0)
+                    {
+                        CreatePortfolio();
+                    }
+
                     if (_needToReloadSecurities)
                     {
                         _needToReloadSecurities = false;
                         TesterRegime = TesterRegime.NotActive;
                         LoadSecurities();
-                    }
-                    if (_portfolios.Count == 0)
-                    {
-                        CreatePortfolio();
                     }
 
                     if (TesterRegime == TesterRegime.Pause ||
@@ -1020,6 +1028,7 @@ namespace OsEngine.Market.Servers.Tester
                     }
                     if (TesterRegime == TesterRegime.Play)
                     {
+                        
                         LoadNextData();
                         CheckOrders();
                     }
@@ -3114,6 +3123,8 @@ namespace OsEngine.Market.Servers.Tester
 
         private object _starterLocker = new object();
 
+        private DateTime _lastStartSecurityTime;
+
         /// <summary>
         /// start uploading data on instrument
         /// Начать выгрузку данных по инструменту. 
@@ -3240,6 +3251,8 @@ namespace OsEngine.Market.Servers.Tester
                 SendLogMessage(OsLocalization.Market.Message14 + series.Security.Name +
                                OsLocalization.Market.Message15 + series.TimeFrame +
                                OsLocalization.Market.Message16, LogMessageType.System);
+
+                _lastStartSecurityTime = DateTime.Now;
 
                 return series;
             }
@@ -3458,6 +3471,7 @@ namespace OsEngine.Market.Servers.Tester
             }
 
             _candleManager.SetNewCandleInSeries(candle, nameSecurity, timeFrame);
+
         }
 
         /// <summary>
@@ -3560,11 +3574,22 @@ namespace OsEngine.Market.Servers.Tester
                 }
             }
 
+            for (int i = 0; i < _allTrades.Length; i++)
+            {
+                List<Trade> curTrades = _allTrades[i];
+
+                if (curTrades != null &&
+                    curTrades.Count > 100)
+                {
+                    curTrades = curTrades.GetRange(curTrades.Count - 101, 100);
+                    _allTrades[i] = curTrades;
+                }
+            }
+
             ServerTime = tradesNew[tradesNew.Count - 1].Time;
 
             if (NewTradeEvent != null)
             {
-
                 foreach (var trades in _allTrades)
                 {
                     if (tradesNew[0].SecurityNameCode == trades[0].SecurityNameCode)
@@ -3797,6 +3822,15 @@ namespace OsEngine.Market.Servers.Tester
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
+        }
+
+        /// <summary>
 		/// updated order on the exchange
         /// обновился ордер на бирже
         /// </summary>
@@ -3952,7 +3986,7 @@ namespace OsEngine.Market.Servers.Tester
 		/// save a log message new 
         /// сохранить новую запись в лог
         /// </summary>
-        private void SendLogMessage(string message, LogMessageType type)
+        public void SendLogMessage(string message, LogMessageType type)
         {
             if (LogMessageEvent != null)
             {
@@ -3981,23 +4015,6 @@ namespace OsEngine.Market.Servers.Tester
     /// </summary>
     public class SecurityTester
     {
-        public SecurityTester()
-        {
-            if (ServerMaster.GetServers() != null &&
-                ServerMaster.GetServers()[0] != null)
-            {
-                ServerMaster.GetServers()[0].NewCandleIncomeEvent += SecurityTester_NewCandleIncomeEvent;
-            }
-        }
-
-        void SecurityTester_NewCandleIncomeEvent(CandleSeries series)
-        {
-            if (series.Security.Name == Security.Name && DataType != SecurityTesterDataType.Candle ||
-                series.Security.Name == Security.Name && series.TimeFrame == TimeFrame)
-            {
-                LastCandle = series.CandlesAll[series.CandlesAll.Count - 1];
-            }
-        }
 
         /// <summary>
 		/// security
@@ -4247,6 +4264,7 @@ namespace OsEngine.Market.Servers.Tester
                 if (NewCandleEvent != null)
                 {
                     NewCandleEvent(LastCandle,Security.Name, TimeFrameSpan);
+
                 }
                 return;
             }

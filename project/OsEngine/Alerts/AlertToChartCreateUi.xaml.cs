@@ -117,6 +117,9 @@ namespace OsEngine.Alerts
 
 
             LabelOsa.MouseDown += LabelOsa_MouseDown;
+
+            this.Activate();
+            this.Focus();
         }
 
         private void ChangeText()
@@ -557,7 +560,7 @@ namespace OsEngine.Alerts
             Enum.TryParse(ComboBoxSignalType.Text, true, out MyAlert.SignalType);
             MyAlert.VolumeReaction = TextBoxVolumeReaction.Text.ToDecimal();
 
-            MyAlert.Slippage = Convert.ToDecimal(TextBoxSlippage.Text);
+            MyAlert.Slippage = TextBoxSlippage.Text.ToDecimal();
             MyAlert.NumberClosePosition = Convert.ToInt32(TextBoxClosePosition.Text);
             Enum.TryParse(ComboBoxOrderType.Text, true, out MyAlert.OrderPriceType);
 

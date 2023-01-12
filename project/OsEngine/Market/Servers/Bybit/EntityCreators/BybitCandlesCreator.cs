@@ -37,7 +37,7 @@ namespace OsEngine.Market.Servers.Bybit.EntityCreators
 
         
 
-        public static List<Candle> GetCandleCollection(Client client, string security, string need_interval_for_query, int from)
+        public static List<Candle> GetCandleCollection(Client client, string security, string need_interval_for_query, int from, BybitServerRealization server)
         {
             Dictionary<string, string> parameters = new Dictionary<string, string>();
 
@@ -45,14 +45,20 @@ namespace OsEngine.Market.Servers.Bybit.EntityCreators
             parameters.Add("interval", need_interval_for_query);
             parameters.Add("limit", "200");
             parameters.Add("from", from.ToString());
+            parameters.Add("recv_window", "90000000");
 
             object account_response = new object();
 
             if (client.FuturesMode == "Inverse")
-                account_response = BybitRestRequestBuilder.CreatePrivateGetQuery(client, "/v2/public/kline/list", parameters);
+                account_response = server.CreatePrivateGetQuery(client, "/v2/public/kline/list", parameters);
 
             if (client.FuturesMode == "USDT")
-                account_response = BybitRestRequestBuilder.CreatePrivateGetQuery(client, "/public/linear/kline", parameters);
+                account_response = server.CreatePrivateGetQuery(client, "/public/linear/kline", parameters);
+
+            if (account_response == null)
+            {
+                return null;
+            }
 
             string isSuccessfull = ((JToken)account_response).SelectToken("ret_msg").Value<string>();
 

@@ -47,6 +47,9 @@ namespace OsEngine.Entity
         /// </summary>
         public string SecurityNameCode;
 
+
+        public string SecurityClassCode;
+
         /// <summary>
         /// account number to which the order belongs
         /// номер счёта которому принадлежит ордер
@@ -93,12 +96,27 @@ namespace OsEngine.Entity
             {
                 if (_trades != null && (_volumeExecute == 0 || _volumeExecuteChange))
                 {
-                    _volumeExecute = _trades.Sum(trade => trade.Volume);
+                    _volumeExecute = 0;
+                    
+                    for(int i = 0;i < _trades.Count;i++)
+                    {
+                        if(_trades[i] == null)
+                        {
+                            continue;
+                        }
+
+                        _volumeExecute += _trades[i].Volume;
+                    }
+                    
                     _volumeExecuteChange = false;
                     return _volumeExecute;
                 }
                 else
                 {
+                    if (_volumeExecute == 0 && State == OrderStateType.Done)
+                    {
+                        return Volume;
+                    }
                     return _volumeExecute;
                 }
 
@@ -238,20 +256,28 @@ namespace OsEngine.Entity
         /// </summary>
         public void SetTrade(MyTrade trade)
         {
-            if ((trade.NumberOrderParent != NumberMarket &&
-                ServerType != ServerType.Oanda) ||
-                (ServerType == ServerType.Oanda &&
-                trade.NumberOrderParent != NumberMarket &&
-                trade.NumberOrderParent != NumberUser.ToString()))
+            if (_trades != null &&
+                _trades.Count > 0
+                && State == OrderStateType.Done
+                && Volume == VolumeExecute)
+            {
+                return;
+            }
+
+            if (trade.NumberOrderParent != NumberMarket)
             {
                 return;
             }
 
             if (_trades != null)
             {
-                foreach (var tradeInArray in _trades)
+                for (int i = 0; i < _trades.Count;i++)
                 {
-                    if (tradeInArray.NumberTrade == trade.NumberTrade)
+                    if (_trades[i] == null)
+                    {
+                        continue;
+                    }
+                    if (_trades[i].NumberTrade == trade.NumberTrade)
                     {
                         // / such an application is already in storage, a stupid API is poisoning with toxic data, we exit
                         // такая заявка уже в хранилище, глупое АПИ травит токсичными данными, выходим
@@ -297,6 +323,11 @@ namespace OsEngine.Entity
 
             for (int i = 0; i < _trades.Count; i++)
             {
+                if(_trades[i] == null)
+                {
+                    continue;
+                }
+
                 price += _trades[i].Volume*_trades[i].Price;
                 volumeExecute += _trades[i].Volume;
             }
@@ -321,8 +352,11 @@ namespace OsEngine.Entity
             {
                 return TimeCallBack;
             }
-
-           return _trades[_trades.Count - 1].Time;
+            if (_trades[0] == null)
+            {
+                return TimeCallBack;
+            }
+            return _trades[_trades.Count - 1].Time;
         }
 
         /// <summary>
@@ -333,7 +367,8 @@ namespace OsEngine.Entity
         {
             get
             {
-                if (_trades == null || _trades.Count == 0)
+                if (_trades == null 
+                    || _trades.Count == 0)
                 {
                     return false;
                 }
@@ -345,35 +380,42 @@ namespace OsEngine.Entity
             }
         }
 
+        private static readonly CultureInfo CultureInfo = new CultureInfo("ru-RU");
+
         /// <summary>
         /// take the string to save
         /// взять строку для сохранения
         /// </summary>
         public StringBuilder GetStringForSave()
         {
+            if (_saveString != null)
+            {
+                return _saveString;
+            }
+
             StringBuilder result = new StringBuilder();
 
             result.Append(NumberUser + "@");
 
-            result.Append( ServerType + "@");
+            result.Append(ServerType + "@");
 
-            result.Append(NumberMarket.ToString(new CultureInfo("ru-RU")) + "@");
+            result.Append(NumberMarket.ToString(CultureInfo) + "@");
             result.Append(Side + "@");
-            result.Append(Price.ToString(new CultureInfo("ru-RU")) + "@");
-            result.Append(PriceReal.ToString(new CultureInfo("ru-RU")) + "@");
-            result.Append(Volume.ToString(new CultureInfo("ru-RU")) + "@");
-            result.Append(VolumeExecute.ToString(new CultureInfo("ru-RU")) + "@");
+            result.Append(Price.ToString(CultureInfo) + "@");
+            result.Append(PriceReal.ToString(CultureInfo) + "@");
+            result.Append(Volume.ToString(CultureInfo) + "@");
+            result.Append(VolumeExecute.ToString(CultureInfo) + "@");
             result.Append(State + "@");
             result.Append(TypeOrder + "@");
-            result.Append(TimeCallBack.ToString(new CultureInfo("ru-RU")) + "@");
+            result.Append(TimeCallBack.ToString(CultureInfo) + "@");
 
             result.Append(SecurityNameCode + "@");
-            result.Append(PortfolioNumber.Replace('@', '%') +"@");
+            result.Append(PortfolioNumber.Replace('@', '%') + "@");
 
-            result.Append(TimeCreate.ToString(new CultureInfo("ru-RU")) + "@");
-            result.Append(TimeCancel.ToString(new CultureInfo("ru-RU")) + "@");
-            result.Append(TimeCallBack.ToString(new CultureInfo("ru-RU")) + "@");
-            
+            result.Append(TimeCreate.ToString(CultureInfo) + "@");
+            result.Append(TimeCancel.ToString(CultureInfo) + "@");
+            result.Append(TimeCallBack.ToString(CultureInfo) + "@");
+
             result.Append(LifeTime + "@");
             // deals with which the order was opened and the order execution price was calculated
             // сделки, которыми открывался ордер и рассчёт цены исполнения ордера
@@ -386,6 +428,11 @@ namespace OsEngine.Entity
             {
                 for (int i = 0; i < _trades.Count; i++)
                 {
+                    if(_trades[i] == null)
+                    {
+                        continue;
+                    }
+
                     result.Append(_trades[i].GetStringFofSave() + "*");
                 }
             }
@@ -393,10 +440,18 @@ namespace OsEngine.Entity
 
             result.Append(Comment + "@");
 
-            result.Append(TimeDone.ToString(new CultureInfo("ru-RU")) + "@");
+            result.Append(TimeDone.ToString(CultureInfo) + "@");
+
+            if (State == OrderStateType.Done && Volume == VolumeExecute &&
+                _trades != null && _trades.Count > 0)
+            {
+                _saveString = result;
+            }
 
             return result;
         }
+
+        private StringBuilder _saveString;
 
         /// <summary>
         /// load order from incoming line
@@ -418,15 +473,15 @@ namespace OsEngine.Entity
 
             Enum.TryParse(saveArray[8], true, out _state);
             Enum.TryParse(saveArray[9], true, out TypeOrder);
-            TimeCallBack = Convert.ToDateTime(saveArray[10]);
+            TimeCallBack = Convert.ToDateTime(saveArray[10], CultureInfo);
 
             SecurityNameCode = saveArray[11];
             PortfolioNumber = saveArray[12].Replace('%', '@');
 
 
-            TimeCreate = Convert.ToDateTime(saveArray[13]);
-            TimeCancel = Convert.ToDateTime(saveArray[14]);
-            TimeCallBack = Convert.ToDateTime(saveArray[15]);
+            TimeCreate = Convert.ToDateTime(saveArray[13], CultureInfo);
+            TimeCancel = Convert.ToDateTime(saveArray[14], CultureInfo);
+            TimeCallBack = Convert.ToDateTime(saveArray[15], CultureInfo);
 
             TimeSpan.TryParse(saveArray[16], out LifeTime);
             // deals with which the order was opened and the order execution price was calculated
@@ -449,7 +504,7 @@ namespace OsEngine.Entity
                 }
             }
             Comment = saveArray[18];
-            TimeDone = Convert.ToDateTime(saveArray[19]);
+            TimeDone = Convert.ToDateTime(saveArray[19], CultureInfo);
         }
     }
 

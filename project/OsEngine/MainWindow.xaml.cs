@@ -22,6 +22,7 @@ using OsEngine.OsMiner;
 using OsEngine.OsOptimizer;
 using OsEngine.OsTrader.Gui;
 using OsEngine.PrimeSettings;
+using OsEngine.Layout;
 
 namespace OsEngine
 {
@@ -95,6 +96,19 @@ namespace OsEngine
             CommandLineInterfaceProcess();
 
             Task.Run(ClearOptimizerWorkResults);
+
+            this.Activate();
+            this.Focus();
+
+            GlobalGUILayout.Listen(this, "mainWindow");
+
+            this.Closed += MainWindow_Closed;
+        }
+
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            ProccesIsWorked = false;
+            GlobalGUILayout.IsClosed = true;
         }
 
         private void ChangeText()
@@ -423,6 +437,10 @@ namespace OsEngine
             else if (Array.Exists(args, a => a.Equals("-tester")))
             {
                 ButtonTesterCandleOne_Click(this, default);
+            }
+            else if (Array.Exists(args, a => a.Equals("-robotslight")))
+            {
+                ButtonRobotLight_Click(this, default);
             }
         }
 

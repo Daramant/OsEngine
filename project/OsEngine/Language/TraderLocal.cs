@@ -716,5 +716,30 @@ namespace OsEngine.Language
         public string Label176 => OsLocalization.ConvertToLocString(
                "Eng: First security_" +
                "Ru: Первая бумага_");
+
+        public string Label177 => OsLocalization.ConvertToLocString(
+               "Eng:Only indicators from SCRIPTS can be used in screeners_" +
+               "Ru:В скринерах можно применять только индикаторы из СКРИПТОВ!_");
+
+        public string Label178 => OsLocalization.ConvertToLocString(
+               "Eng:Server_" +
+               "Ru:Сервер_");
+
+        public string Label179 => OsLocalization.ConvertToLocString(
+               "Eng:Time frame_" +
+               "Ru:Тайм фрейм_");
+
+        public string Label180 => OsLocalization.ConvertToLocString(
+               "Eng:The price of a stop order in the market. In the tester and optimizer, because of this, there may and will be errors with profit calculation. Correct the logic of the robot_" +
+               "Ru:Цена стоп ордера в рынке.В тестере и оптимизаторе из-за этого могут и будут ошибки с подсчётом прибыли.Исправьте логику робота_");
+
+        public string Label181 => OsLocalization.ConvertToLocString(
+               "Eng:The price of a profit order in the market. In the tester and optimizer, because of this, there may and will be errors with profit calculation. Correct the logic of the robot_" +
+               "Ru:Цена профит ордера в рынке.В тестере и оптимизаторе из-за этого могут и будут ошибки с подсчётом прибыли.Исправьте логику робота_");
+
+        public string Label182 => OsLocalization.ConvertToLocString(
+               "Eng: Board_" +
+               "Ru: Площадка_");
+
     }
 }

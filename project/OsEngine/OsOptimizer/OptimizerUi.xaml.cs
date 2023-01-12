@@ -19,6 +19,7 @@ using MessageBox = System.Windows.MessageBox;
 using ProgressBar = System.Windows.Controls.ProgressBar;
 using OsEngine.OsOptimizer.OptEntity;
 using System.Threading;
+using OsEngine.Layout;
 
 namespace OsEngine.OsOptimizer
 {
@@ -161,13 +162,15 @@ namespace OsEngine.OsOptimizer
             CheckBoxFilterDealsCount.Content = OsLocalization.Optimizer.Label34;
             ButtonStrategySelect.Content = OsLocalization.Optimizer.Label35;
             Label23.Content = OsLocalization.Optimizer.Label36;
+            ButtonPositionSupport.Content = OsLocalization.Trader.Label47;
 
             TabControlResultsSeries.Header = OsLocalization.Optimizer.Label37;
             TabControlResultsOutOfSampleResults.Header = OsLocalization.Optimizer.Label38;
             LabelSortBy.Content = OsLocalization.Optimizer.Label39;
             CheckBoxLastInSample.Content = OsLocalization.Optimizer.Label42;
             LabelIteartionCount.Content = OsLocalization.Optimizer.Label47;
-
+            ButtonStrategyReload.Content = OsLocalization.Optimizer.Label48;
+            ButtonResults.Content = OsLocalization.Optimizer.Label49;
 
             _resultsCharting = new OptimizerReportCharting(
                 WindowsFormsHostDependences, WindowsFormsHostColumnsResults,
@@ -177,6 +180,11 @@ namespace OsEngine.OsOptimizer
             this.Closing += Ui_Closing;
 
             Task.Run(new Action(StrategyLoader));
+
+            this.Activate();
+            this.Focus();
+
+            GlobalGUILayout.Listen(this, "optimizerUi");
         }
 
         void Ui_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -239,7 +247,10 @@ namespace OsEngine.OsOptimizer
             _reports = reports;
             RepaintResults();
             ShowResultDialog();
+            _testIsEnd = true;
         }
+
+        private bool _testIsEnd;
 
         private List<OptimazerFazeReport> _reports;
 
@@ -367,6 +378,20 @@ namespace OsEngine.OsOptimizer
             if (!_progressBars[0].Dispatcher.CheckAccess())
             {
                 _progressBars[0].Dispatcher.Invoke(PaintAllProgressBars);
+                return;
+            }
+
+            if(_testIsEnd)
+            {
+                ProgressBarPrime.Maximum = 100;
+                ProgressBarPrime.Value = 100;
+
+                for (int i2 = 0; i2 > -1 && i2 < _progressBars.Count; i2++)
+                {
+                    _progressBars[i2].Maximum = 100;
+                    _progressBars[i2].Value = 100;
+                }
+
                 return;
             }
 
@@ -498,6 +523,8 @@ namespace OsEngine.OsOptimizer
                     return;
                 }
             }
+
+            _testIsEnd = false;
 
             if (ButtonGo.Content.ToString() == OsLocalization.Optimizer.Label9 && _master.Start())
             {
@@ -683,7 +710,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableTabsSimple()
         {
-            _gridTableTabsSimple = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.ColumnHeaderSelect, DataGridViewAutoSizeRowsMode.None);
+            _gridTableTabsSimple = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.ColumnHeaderSelect, DataGridViewAutoSizeRowsMode.AllCells);
 
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
             cell0.Style = _gridTableTabsSimple.DefaultCellStyle;
@@ -724,6 +751,11 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void PaintTableTabsSimple()
         {
+            if (_gridTableTabsSimple == null)
+            {
+                return;
+            }
+
             if (_gridTableTabsSimple.InvokeRequired)
             {
                 _gridTableTabsIndex.Invoke(new Action(PaintTableTabsSimple));
@@ -736,16 +768,7 @@ namespace OsEngine.OsOptimizer
             {
                 return;
             }
-            if (_gridTableTabsSimple == null)
-            {
-                return;
-            }
 
-            if (_gridTableTabsSimple.InvokeRequired)
-            {
-                _gridTableTabsSimple.Invoke(new Action(PaintTableTabsSimple));
-                return;
-            }
 
             _gridTableTabsSimple.Rows.Clear();
             List<string> names = new List<string>();
@@ -790,8 +813,6 @@ namespace OsEngine.OsOptimizer
                 timeFrame.Add(TimeFrame.Hour4.ToString());
             }
 
-
-            int countTab = 0;
             string nameBot = _master.StrategyName;
 
             BotPanel bot = BotFactory.GetStrategyForName(nameBot, "", StartProgram.IsOsOptimizer, _master.IsScript);
@@ -800,6 +821,20 @@ namespace OsEngine.OsOptimizer
             {
                 return;
             }
+
+            PaintBotParams(bot, names, timeFrame);
+        }
+
+        private void PaintBotParams(BotPanel bot, List<string> names, List<string> timeFrame)
+        {
+            if (_gridTableTabsSimple.InvokeRequired)
+            {
+                _gridTableTabsIndex.Invoke(new Action<BotPanel, List<string>, List<string>>(PaintBotParams),bot,names,timeFrame);
+                return;
+            }
+
+            int countTab = 0;
+
             if (bot.TabsSimple != null)
             {
                 countTab += bot.TabsSimple.Count;
@@ -808,6 +843,8 @@ namespace OsEngine.OsOptimizer
             {
                 return;
             }
+
+            _gridTableTabsSimple.Rows.Clear();
 
             for (int i = 0; i < countTab; i++)
             {
@@ -832,6 +869,7 @@ namespace OsEngine.OsOptimizer
 
                 _gridTableTabsSimple.Rows.Insert(0, row);
             }
+
         }
 
         /// <summary>
@@ -880,7 +918,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableTabsIndex()
         {
-            _gridTableTabsIndex = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.ColumnHeaderSelect, DataGridViewAutoSizeRowsMode.None);
+            _gridTableTabsIndex = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.ColumnHeaderSelect, DataGridViewAutoSizeRowsMode.AllCells);
 
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
             cell0.Style = _gridTableTabsIndex.DefaultCellStyle;
@@ -998,6 +1036,12 @@ namespace OsEngine.OsOptimizer
         {
             _master.ReloadFazes();
             PaintTableOptimizeFazes();
+
+            if(_master.Fazes.Count == 0)
+            {
+                return;
+            }
+
             WolkForwardPeriodsPainter.PaintForwards(HostWalkForwardPeriods, _master.Fazes);
         }
 
@@ -1013,7 +1057,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableOptimizeFazes()
         {
-            _gridFazes = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.CellSelect, DataGridViewAutoSizeRowsMode.None);
+            _gridFazes = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.CellSelect, DataGridViewAutoSizeRowsMode.AllCells);
             _gridFazes.ScrollBars = ScrollBars.Vertical;
 
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
@@ -1100,10 +1144,14 @@ namespace OsEngine.OsOptimizer
                 {
                     _gridFazes.Rows[indexRow].Cells[indexColumn].Value = _master.Fazes[indexRow].TimeEnd.ToShortDateString(); ;
                 }
-
             }
+
             PaintTableOptimizeFazes();
-            WolkForwardPeriodsPainter.PaintForwards(HostWalkForwardPeriods, _master.Fazes);
+
+            if (_master.Fazes.Count != 0)
+            {
+                WolkForwardPeriodsPainter.PaintForwards(HostWalkForwardPeriods, _master.Fazes);
+            }
         }
 
 
@@ -1182,7 +1230,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableParametrs()
         {
-            _gridParametrs = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.CellSelect, DataGridViewAutoSizeRowsMode.None);
+            _gridParametrs = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.CellSelect, DataGridViewAutoSizeRowsMode.AllCells);
             _gridParametrs.ScrollBars = ScrollBars.Vertical;
 
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
@@ -1597,7 +1645,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableFazes()
         {
-            _gridFazesEnd = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect, DataGridViewAutoSizeRowsMode.None);
+            _gridFazesEnd = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect, DataGridViewAutoSizeRowsMode.AllCells);
             _gridFazesEnd.ScrollBars = ScrollBars.Vertical;
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
             cell0.Style = _gridFazesEnd.DefaultCellStyle;
@@ -2302,6 +2350,11 @@ namespace OsEngine.OsOptimizer
                 return;
             }
             ReloadStrategy();
+        }
+
+        private void ButtonPositionSupport_Click(object sender, RoutedEventArgs e)
+        {
+            _master.ShowManualControlDialog();
         }
     }
 

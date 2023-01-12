@@ -46,7 +46,7 @@ namespace OsEngine.Market.Servers.BitMax
         /// </summary>
         public ServerType ServerType
         {
-            get { return ServerType.BitMax; }
+            get { return ServerType.AscendEx_BitMax; }
         }
 
         /// <summary>
@@ -267,6 +267,15 @@ namespace OsEngine.Market.Servers.BitMax
             }
             
             _client.CancelOrder(order, needId);
+        }
+
+        /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
         }
 
         /// <summary>

@@ -615,16 +615,16 @@ namespace OsEngine.OsTrader
         /// </summary>
         private GlobalPosition _globalController;
 
-        /// <summary>
-        /// journal window
-        /// </summary>
-        private JournalUi _journalUi;
+
+        private JournalUi2 _journalUi2;
+
+        private JournalUi _journalUi1;
 
         /// <summary>
         /// show journal for all robots
         /// показать журнал по всем роботам
         /// </summary>
-        public void ShowCommunityJournal()
+        public void ShowCommunityJournal(int journalVersion, double top, double left)
         {
             try
             {
@@ -634,9 +634,15 @@ namespace OsEngine.OsTrader
                     return;
                 }
 
-                if (_journalUi != null)
+                if (_journalUi2 != null)
                 {
-                    _journalUi.Activate();
+                    _journalUi2.Activate();
+                    return;
+                }
+
+                if (_journalUi1 != null)
+                {
+                    _journalUi1.Activate();
                     return;
                 }
 
@@ -653,6 +659,7 @@ namespace OsEngine.OsTrader
 
                     BotPanelJournal botPanel = new BotPanelJournal();
                     botPanel.BotName = PanelsArray[i].NameStrategyUniq;
+                    botPanel.BotClass = PanelsArray[i].GetNameStrategyType();
                     botPanel._Tabs = new List<BotTabJournal>();
 
                     for (int i2 = 0; journals != null && i2 < journals.Count; i2++)
@@ -666,10 +673,42 @@ namespace OsEngine.OsTrader
                     panelsJournal.Add(botPanel);
                 }
 
-                _journalUi = new JournalUi(panelsJournal, _startProgram);
-                _journalUi.LogMessageEvent += SendNewLogMessage;
-                _journalUi.Closed += _journalUi_Closed;
-                _journalUi.Show();
+                if(journalVersion == 2)
+                {
+                    _journalUi2 = new JournalUi2(panelsJournal, _startProgram);
+                    _journalUi2.LogMessageEvent += SendNewLogMessage;
+                    _journalUi2.Closed += _journalUi_Closed;
+
+                    if (top != 0 && left != 0)
+                    {
+                        _journalUi2.Top = top;
+                        _journalUi2.Left = left;
+                    }
+                    else
+                    {
+                        _journalUi2.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    }
+
+                    _journalUi2.Show();
+                }
+                if (journalVersion == 1)
+                {
+                    _journalUi1 = new JournalUi(panelsJournal, _startProgram);
+                    _journalUi1.LogMessageEvent += SendNewLogMessage;
+                    _journalUi1.Closed += _journalUi_Closed;
+
+                    if (top != 0 && left != 0)
+                    {
+                        _journalUi1.Top = top;
+                        _journalUi1.Left = left;
+                    }
+                    else
+                    {
+                        _journalUi1.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                    }
+                                
+                    _journalUi1.Show();
+                }
             }
             catch (Exception error)
             {
@@ -677,10 +716,26 @@ namespace OsEngine.OsTrader
             }
         }
 
-        void _journalUi_Closed(object sender, EventArgs e)
+        private void _journalUi_Closed(object sender, EventArgs e)
         {
-            _journalUi.IsErase = true;
-            _journalUi = null;
+            if(_journalUi2 != null)
+            {
+                _journalUi2.LogMessageEvent -= SendNewLogMessage;
+                _journalUi2.Closed -= _journalUi_Closed;
+                _journalUi2.IsErase = true;
+                _journalUi2 = null;
+            }
+
+            if (_journalUi1 != null)
+            {
+                _journalUi1.LogMessageEvent -= SendNewLogMessage;
+                _journalUi1.Closed -= _journalUi_Closed;
+                _journalUi1.IsErase = true;
+                _journalUi1 = null;
+            }
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
 
         // log / логироавние
@@ -798,21 +853,22 @@ namespace OsEngine.OsTrader
                     _tabBotNames.Dispatcher.Invoke(StrategyKeeper_TestingFastEvent);
                     return;
                 }
-                if (_activPanel != null)
-                {
-                    _activPanel.StopPaint();
-                }
 
                 _fastRegimeOn = true;
                 ServerMaster.StopPaint();
                 _globalController.StopPaint();
+
                 if(_tabBotNames != null)
                 {
                     _tabBotNames.IsEnabled = false;
+
+                    if (_activPanel != null)
+                    {
+                        _activPanel.StopPaint();
+                    }
                 }
                 
                 _log.StopPaint();
-
             }
             catch (Exception error)
             {
@@ -1356,8 +1412,6 @@ namespace OsEngine.OsTrader
         public event Action<BotPanel> BotCreateEvent;
 
         public event Action<BotPanel> BotDeleteEvent;
-
-
 
     }
 }

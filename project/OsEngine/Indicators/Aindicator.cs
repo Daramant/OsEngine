@@ -13,14 +13,20 @@ namespace OsEngine.Indicators
 {
     public abstract class Aindicator : IIndicator
     {
-        public void Init(string name)
+        public void Init(string name,StartProgram startProgram)
         {
             Name = name;
             CanDelete = true;
-            Load();
+
+            if(startProgram != StartProgram.IsOsOptimizer)
+            {
+                Load();
+            }
 
             OnStateChange(IndicatorState.Configure);
         }
+
+        public StartProgram StartProgram;
 
         public abstract void OnStateChange(IndicatorState state);
 
@@ -117,7 +123,6 @@ namespace OsEngine.Indicators
 
             return (IndicatorParameterString)LoadParameterValues(newParameter);
         }
-
 
         /// <summary>
         /// create bool type parameter / 
@@ -233,6 +238,12 @@ namespace OsEngine.Indicators
             {
                 return;
             }
+
+            if(StartProgram == StartProgram.IsOsOptimizer)
+            {
+                return;
+            }
+
             try
             {
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + Name + @"Parametrs.txt", false)
@@ -302,6 +313,11 @@ namespace OsEngine.Indicators
         public void Save()
         {
             if (Name == "")
+            {
+                return;
+            }
+
+            if(StartProgram == StartProgram.IsOsOptimizer)
             {
                 return;
             }
@@ -456,6 +472,8 @@ namespace OsEngine.Indicators
 
         public bool PaintOn { get; set; }
 
+        public bool IsOn { get; set; } = true;
+
         #endregion
 
         /// <summary>
@@ -469,7 +487,10 @@ namespace OsEngine.Indicators
                 return;
             }
 
-            ProcessAll(_myCandles);
+            //lock(_indicatorUpdateLocker)
+            //{
+                ProcessAll(_myCandles);
+            //}
 
             if (NeadToReloadEvent != null)
             {
@@ -477,17 +498,21 @@ namespace OsEngine.Indicators
             }
         }
 
+        //private string _indicatorUpdateLocker = "indLocker";
+
         public event Action<IIndicator> NeadToReloadEvent;
 
         public void Clear()
         {
             _myCandles = new List<Candle>();
 
-            for (int i = 0; i < DataSeries.Count; i++)
-            {
-                DataSeries[i].Values.Clear();
-            }
-
+            //lock(_indicatorUpdateLocker)
+            //{
+                for (int i = 0; i < DataSeries.Count; i++)
+                {
+                    DataSeries[i].Values.Clear();
+                }
+            //}
         }
 
         private List<Candle> _myCandles = new List<Candle>();
@@ -496,34 +521,37 @@ namespace OsEngine.Indicators
 
         public void Process(List<Candle> candles)
         {
-            if (candles.Count == 0)
-            {
-                return;
-            }
-            if (_myCandles == null ||
+            //lock(_indicatorUpdateLocker)
+            //{
+                if (candles.Count == 0)
+                {
+                    return;
+                }
+                if (_myCandles == null ||
                 candles.Count < _myCandles.Count ||
                 candles.Count > _myCandles.Count + 1)
-            {
-                ProcessAll(candles);
-            }
-            else if (candles.Count < DataSeries[0].Values.Count)
-            {
-                foreach (var ds in DataSeries)
                 {
-                    ds.Values.Clear();
+                    ProcessAll(candles);
                 }
-                ProcessAll(candles);
-            }
-            else if (_myCandles.Count == candles.Count)
-            {
-                ProcessLast(candles);
-            }
-            else if (_myCandles.Count + 1 == candles.Count)
-            {
-                ProcessNew(candles, candles.Count-1);
-            }
+                else if (candles.Count < DataSeries[0].Values.Count)
+                {
+                    foreach (var ds in DataSeries)
+                    {
+                        ds.Values.Clear();
+                    }
+                    ProcessAll(candles);
+                }
+                else if (_myCandles.Count == candles.Count)
+                {
+                    ProcessLast(candles);
+                }
+                else if (_myCandles.Count + 1 == candles.Count)
+                {
+                    ProcessNew(candles, candles.Count - 1);
+                }
 
-            _myCandles = candles;
+                _myCandles = candles;
+            //}
         }
 
         private void ProcessAll(List<Candle> candles)
@@ -547,9 +575,51 @@ namespace OsEngine.Indicators
 
         private void ProcessLast(List<Candle> candles)
         {
+            for (int i = 0; i < DataSeries.Count; i++)
+            {
+                while (DataSeries[i].Values.Count < candles.Count)
+                {
+                    DataSeries[i].Values.Add(0);
+                }
+            }
+
+            for (int i = 0; i < IncludeIndicators.Count; i++)
+            {
+                if (IncludeIndicators[i].IsOn == true &&
+                    IsOn == false)
+                {
+                    IncludeIndicators[i].IsOn = false;
+                }
+                if (IncludeIndicators[i].IsOn == false &&
+                    IsOn == true)
+                {
+                    IncludeIndicators[i].IsOn = true;
+                }
+            }
+
+            if (candles.Count <= 0)
+            {
+                return;
+            }
             for (int i = 0; i < IncludeIndicators.Count; i++)
             {
                 IncludeIndicators[i].Process(candles);
+            }
+
+            if (IsOn == false)
+            {
+                return;
+            }
+
+            OnProcess(candles, candles.Count - 1);
+        }
+
+        private void ProcessNew(List<Candle> candles, int index)
+        {
+            if (candles.Count <= 0 ||
+                index < 0)
+            {
+                return;
             }
 
             for (int i = 0; i < DataSeries.Count; i++)
@@ -560,21 +630,28 @@ namespace OsEngine.Indicators
                 }
             }
 
-            OnProcess(candles, candles.Count - 1);
-        }
+            for (int i = 0; i < IncludeIndicators.Count; i++)
+            {
+                if (IncludeIndicators[i].IsOn == true &&
+                    IsOn == false)
+                {
+                    IncludeIndicators[i].IsOn = false;
+                }
+                if (IncludeIndicators[i].IsOn == false &&
+                    IsOn == true)
+                {
+                    IncludeIndicators[i].IsOn = true;
+                }
+            }
 
-        private void ProcessNew(List<Candle> candles, int index)
-        {
             for (int i = 0; i < IncludeIndicators.Count; i++)
             {
                 IncludeIndicators[i].Process(candles);
             }
-            for (int i = 0; i < DataSeries.Count; i++)
+
+            if (IsOn == false)
             {
-                while (DataSeries[i].Values.Count < index + 1)
-                {
-                    DataSeries[i].Values.Add(0);
-                }
+                return;
             }
 
             OnProcess(candles, index);
@@ -584,24 +661,27 @@ namespace OsEngine.Indicators
 
         public void Process(List<decimal> values)
         {
-            if (values.Count == 0)
-            {
-                return;
-            }
-            if (_myCandles == null ||
-                values.Count < _myCandles.Count ||
-                values.Count > _myCandles.Count + 1)
-            {
-                ProcessAll(values);
-            }
-            else if (_myCandles.Count == values.Count)
-            {
-                ProcessLast(values);
-            }
-            else if (_myCandles.Count + 1 == values.Count)
-            {
-                ProcessNew(values, values.Count);
-            }
+            //lock(_indicatorUpdateLocker)
+            //{
+                if (values.Count == 0)
+                {
+                    return;
+                }
+                if (_myCandles == null ||
+                    values.Count < _myCandles.Count ||
+                    values.Count > _myCandles.Count + 1)
+                {
+                    ProcessAll(values);
+                }
+                else if (_myCandles.Count == values.Count)
+                {
+                    ProcessLast(values);
+                }
+                else if (_myCandles.Count + 1 == values.Count)
+                {
+                    ProcessNew(values, values.Count);
+                }
+           // }
         }
 
         private void ProcessAll(List<decimal> values)
@@ -625,9 +705,9 @@ namespace OsEngine.Indicators
 
         private void ProcessLast(List<decimal> values)
         {
-            for (int i = 0; i < IncludeIndicators.Count; i++)
+            if (values.Count <= 0)
             {
-                IncludeIndicators[i].Process(values);
+                return;
             }
 
             for (int i = 0; i < DataSeries.Count; i++)
@@ -636,6 +716,30 @@ namespace OsEngine.Indicators
                 {
                     DataSeries[i].Values.Add(0);
                 }
+            }
+
+            for (int i = 0; i < IncludeIndicators.Count; i++)
+            {
+                if (IncludeIndicators[i].IsOn == true &&
+                    IsOn == false)
+                {
+                    IncludeIndicators[i].IsOn = false;
+                }
+                if (IncludeIndicators[i].IsOn == false &&
+                    IsOn == true)
+                {
+                    IncludeIndicators[i].IsOn = true;
+                }
+            }
+
+            for (int i = 0; i < IncludeIndicators.Count; i++)
+            {
+                IncludeIndicators[i].Process(values);
+            }
+
+            if (IsOn == false)
+            {
+                return;
             }
 
             while (_myCandles.Count < values.Count)
@@ -653,16 +757,42 @@ namespace OsEngine.Indicators
 
         private void ProcessNew(List<decimal> values, int index)
         {
+            if (values.Count <= 0 ||
+                index <= 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < DataSeries.Count; i++)
+            {
+                while (DataSeries[i].Values.Count < values.Count)
+                {
+                    DataSeries[i].Values.Add(0);
+                }
+            }
+
+            for (int i = 0; i < IncludeIndicators.Count; i++)
+            {
+                if(IncludeIndicators[i].IsOn == true &&
+                    IsOn == false)
+                {
+                    IncludeIndicators[i].IsOn = false;
+                }
+                if (IncludeIndicators[i].IsOn == false &&
+                    IsOn == true)
+                {
+                    IncludeIndicators[i].IsOn = true;
+                }
+            }
+
             for (int i = 0; i < IncludeIndicators.Count; i++)
             {
                 IncludeIndicators[i].Process(values);
             }
-            for (int i = 0; i < DataSeries.Count; i++)
+
+            if (IsOn == false)
             {
-                while (DataSeries[i].Values.Count < index + 1)
-                {
-                    DataSeries[i].Values.Add(0);
-                }
+                return;
             }
 
             while (_myCandles.Count < index)

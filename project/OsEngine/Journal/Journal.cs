@@ -10,7 +10,6 @@ using OsEngine.Alerts;
 using OsEngine.Entity;
 using OsEngine.Journal.Internal;
 using OsEngine.Logging;
-using OsEngine.Market;
 
 namespace OsEngine.Journal
 {
@@ -119,6 +118,11 @@ namespace OsEngine.Journal
         /// хранилище сделок
         /// </summary>
         private PositionController _positionController;
+
+        public void NeadToUpdateStatePositions()
+        {
+            _positionController.NeadToUpdateStatePositions();
+        }
 
         /// <summary>
         /// take out open deals

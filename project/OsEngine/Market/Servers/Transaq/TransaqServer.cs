@@ -336,7 +336,7 @@ namespace OsEngine.Market.Servers.Transaq
 
         public void GetOrdersState(List<Order> orders)
         {
-            throw new NotSupportedException("The operation of receiving the status of orders is not supported in the current connector");
+          
         }
 
         private List<Portfolio> _portfolios;
@@ -447,7 +447,15 @@ namespace OsEngine.Market.Servers.Transaq
         {
             string side = order.Side == Side.Buy ? "B" : "S";
 
-            var needSec = _securities.Find(s => s.Name == order.SecurityNameCode);
+            Security needSec = _securities.Find(
+                s => s.Name == order.SecurityNameCode &&
+                s.NameClass == order.SecurityClassCode);
+
+            if(needSec == null)
+            {
+                needSec = _securities.Find(
+                s => s.Name == order.SecurityNameCode);
+            }
 
             string cmd = "<command id=\"neworder\">";
             cmd += "<security>";
@@ -491,7 +499,7 @@ namespace OsEngine.Market.Servers.Transaq
             else
             {
                 order.NumberUser = result.TransactionId;
-                order.State = OrderStateType.Pending;
+                order.State = OrderStateType.Activ;
             }
 
             order.TimeCallBack = ServerTime;
@@ -516,6 +524,15 @@ namespace OsEngine.Market.Servers.Transaq
             {
                 SendLogMessage(res, LogMessageType.Error);
             }
+        }
+
+        /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
         }
 
         /// <summary>
@@ -1239,8 +1256,16 @@ namespace OsEngine.Market.Servers.Transaq
                     security.SecurityType = securityData.Sectype == "FUT" ? SecurityType.Futures
                         : securityData.Sectype == "SHARE" ? SecurityType.Stock
                         : securityData.Sectype == "OPT" ? SecurityType.Option
+                        : securityData.Sectype == "BOND" ? SecurityType.Bond
                         : securityData.Sectype == "CURRENCY" || securityData.Sectype == "CETS" ? SecurityType.CurrencyPair
                         : SecurityType.None;
+
+                    if (security.NameClass == "MCT"
+                        && security.SecurityType == SecurityType.None
+                        && (security.NameFull.Contains("call") || security.NameFull.Contains("put")))
+                    {
+                        security.NameClass = "MCT_put_call";
+                    }
 
                     security.Lot = securityData.Lotsize.ToDecimal();
 
@@ -1342,7 +1367,7 @@ namespace OsEngine.Market.Servers.Transaq
                     Trade trade = new Trade()
                     {
                         SecurityNameCode = t.Seccode,
-                        Id = t.Secid,
+                        Id = t.Tradeno,
                         Price = Convert.ToDecimal(t.Price.Replace(".", ",")),
                         Side = t.Buysell == "B" ? Side.Buy : Side.Sell,
                         Volume = Convert.ToDecimal(t.Quantity.Replace(".", ",")),

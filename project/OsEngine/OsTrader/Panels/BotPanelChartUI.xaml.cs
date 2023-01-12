@@ -7,17 +7,17 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Forms.Integration;
-using System.Windows.Shapes;
 using OsEngine.Charts.CandleChart;
 using OsEngine.Entity;
 using OsEngine.Journal;
 using OsEngine.Language;
 using OsEngine.Logging;
 using OsEngine.Market;
-using OsEngine.Market.Connectors;
 using OsEngine.OsTrader.Panels.Tab;
+using OsEngine.Market.Servers;
+using OsEngine.Market.Servers.Tester;
+using OsEngine.Layout;
+using System.IO;
 
 namespace OsEngine.OsTrader.Panels
 {
@@ -30,11 +30,74 @@ namespace OsEngine.OsTrader.Panels
             StartPaint();
             Local();
 
-            Closed += delegate (object sender, EventArgs args)
+            Closed += BotPanelChartUi_Closed;
+
+            if (panel.StartProgram == StartProgram.IsTester)
+            {
+                List<IServer> servers = ServerMaster.GetServers();
+
+                for (int i = 0; servers != null && i < servers.Count; i++)
+                {
+                    if (servers[i].ServerType == ServerType.Tester)
+                    {
+                        _testerServer = (TesterServer)servers[i];
+                        break;
+                    }
+                }
+
+                if (_testerServer != null)
+                {
+                    _testerServer.TestingFastEvent += Serv_TestingFastEvent;
+                }
+
+            }
+
+            LocationChanged += RobotUi_LocationChanged;
+            TabControlBotsName.SizeChanged += TabControlBotsName_SizeChanged;
+
+            Title = panel.GetType().Name;
+            TabControlBotsName.Items[0] = panel.NameStrategyUniq;
+            ButtonShowInformPanel.Visibility = Visibility.Hidden;
+
+            this.Activate();
+            this.Focus();
+
+            _panelName = panel.NameStrategyUniq;
+            CheckPanels();
+
+            GlobalGUILayout.Listen(this, "botPanel_" + panel.NameStrategyUniq);
+        }
+
+        // для тестирования
+
+        TesterServer _testerServer = null;
+
+        private void Serv_TestingFastEvent()
+        {
+            if (_testerServer.TestingFastIsActivate == true)
             {
                 _panel.StopPaint();
-                _panel = null;
-            };
+            }
+            else if (_testerServer.TestingFastIsActivate == false)
+            {
+                StartPaint();
+                _panel.MoveChartToTheRight();
+            }
+        }
+
+        private void BotPanelChartUi_Closed(object sender, EventArgs e)
+        {
+            Closed -= BotPanelChartUi_Closed;
+            _panel.StopPaint();
+            _panel = null;
+            LocationChanged -= RobotUi_LocationChanged;
+            TabControlBotsName.SizeChanged -= TabControlBotsName_SizeChanged;
+
+            if (_testerServer != null)
+            {
+                _testerServer.TestingFastEvent -= Serv_TestingFastEvent;
+                _testerServer = null;
+            }
         }
 
         public void StartPaint()
@@ -42,9 +105,6 @@ namespace OsEngine.OsTrader.Panels
             _panel.StartPaint(GridChart, ChartHostPanel, HostGlass, HostOpenPosition,
              HostClosePosition, HostBotLog, RectChart,
              HostAllert, TabControlBotTab, TextBoxPrice, GridChartControlPanel);
-
-            LocationChanged += RobotUi_LocationChanged;
-            TabControlBotsName.SizeChanged += TabControlBotsName_SizeChanged;
         }
 
         private BotPanel _panel;
@@ -94,6 +154,7 @@ namespace OsEngine.OsTrader.Panels
             ButtonRiskManager.Content = OsLocalization.Trader.Label46;
             ButtonStrategSettings.Content = OsLocalization.Trader.Label47;
             ButtonStrategSettingsIndividual.Content = OsLocalization.Trader.Label43;
+            ButtonRedactTab.Content = OsLocalization.Trader.Label44;
         }
 
         private void buttonBuyFast_Click_1(object sender, RoutedEventArgs e)
@@ -249,6 +310,8 @@ namespace OsEngine.OsTrader.Panels
 
                 BotPanelJournal botPanel = new BotPanelJournal();
                 botPanel.BotName = _panel.NameStrategyUniq;
+                botPanel.BotClass = _panel.GetNameStrategyType();
+
                 botPanel._Tabs = new List<BotTabJournal>();
 
                 for (int i2 = 0; journals != null && i2 < journals.Count; i2++)
@@ -261,20 +324,21 @@ namespace OsEngine.OsTrader.Panels
 
                 panelsJournal.Add(botPanel);
 
-
                 _journalUi = new JournalUi(panelsJournal, _panel.StartProgram);
-                _journalUi.Closed += delegate (object o, EventArgs args)
-                {
-                    _journalUi.IsErase = true;
-                    _journalUi = null;
-                };
-
+                _journalUi.Closed += _journalUi_Closed;
                 _journalUi.Show();
             }
             catch (Exception error)
             {
                 SendNewLogMessage(error.ToString(), LogMessageType.Error);
             }
+        }
+
+        private void _journalUi_Closed(object sender, EventArgs e)
+        {
+            _journalUi.Closed -= _journalUi_Closed;
+            _journalUi.IsErase = true;
+            _journalUi = null;
         }
 
         private void ButtonRiskManager_Click(object sender, RoutedEventArgs e)
@@ -368,6 +432,160 @@ namespace OsEngine.OsTrader.Panels
             }
         }
 
+        private void ButtonHideInformPanel_Click(object sender, RoutedEventArgs e)
+        {
+            HideInformPanel();
+            SaveLeftPanelPosition();
+        }
 
+        private void ButtonShowInformPanel_Click(object sender, RoutedEventArgs e)
+        {
+            ShowInformPanel();
+            SaveLeftPanelPosition();
+        }
+
+        private void ButtonHideShowSettingsPanel_Click(object sender, RoutedEventArgs e)
+        {
+            if (ButtonHideShowSettingsPanel.Content.ToString() == ">")
+            {
+                HideSettigsPanel();
+            }
+            else if (ButtonHideShowSettingsPanel.Content.ToString() == "<")
+            {
+                ShowSettingsPanel();
+            }
+            SaveLeftPanelPosition();
+        }
+
+        private void HideInformPanel()
+        {
+            TabControlPrime.Visibility = Visibility.Hidden;
+            GridPrime.RowDefinitions[1].Height = new GridLength(0);
+            GreedTraderEngine.Margin = new Thickness(0, 0, 0, 0);
+            ButtonShowInformPanel.Visibility = Visibility.Visible;
+
+            //GreedChartPanel.Margin = new Thickness(0, 26, 308, 0);
+
+            if (GreedTraderEngine.Visibility == Visibility.Visible)
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 308, 0);
+            }
+            else
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 0, 0);
+            }
+            _informPanelIsHide = true;
+        }
+
+        private void ShowInformPanel()
+        {
+            ButtonShowInformPanel.Visibility = Visibility.Hidden;
+
+            GridPrime.RowDefinitions[1].Height = new GridLength(190);
+            GreedTraderEngine.Margin = new Thickness(0, 0, 0, 182);
+            TabControlPrime.Visibility = Visibility.Visible;
+
+            //GreedChartPanel.Margin = new Thickness(0, 26, 308, 10);
+
+            if (GreedTraderEngine.Visibility == Visibility.Visible)
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 308, 10);
+            }
+            else
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 0, 10);
+            }
+            _informPanelIsHide = false;
+        }
+
+        private void HideSettigsPanel()
+        {
+            ButtonHideShowSettingsPanel.Content = "<";
+            GreedTraderEngine.Visibility = Visibility.Hidden;
+
+            if (TabControlPrime.Visibility == Visibility.Visible)
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 0, 10);
+            }
+            else
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 0, 0);
+            }
+            _settingsPanelIsHide = true;
+        }
+
+        private void ShowSettingsPanel()
+        {
+            ButtonHideShowSettingsPanel.Content = ">";
+            GreedTraderEngine.Visibility = Visibility.Visible;
+
+            if (TabControlPrime.Visibility == Visibility.Visible)
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 308, 10);
+            }
+            else
+            {
+                GreedChartPanel.Margin = new Thickness(0, 26, 308, 0);
+            }
+            _settingsPanelIsHide = false;
+        }
+
+        // сохранение и загрузка состояния схлопывающихся панелей
+
+        private string _panelName;
+
+        private bool _settingsPanelIsHide;
+
+        private bool _informPanelIsHide;
+
+        private void CheckPanels()
+        {
+            if (!File.Exists(@"Engine\LayoutRobotUi" + _panelName + ".txt"))
+            {
+                return;
+            }
+
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\LayoutRobotUi" + _panelName + ".txt"))
+                {
+                    _settingsPanelIsHide = Convert.ToBoolean(reader.ReadLine());
+                    _informPanelIsHide = Convert.ToBoolean(reader.ReadLine());
+                    reader.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+
+            if (_settingsPanelIsHide)
+            {
+                HideSettigsPanel();
+            }
+
+            if (_informPanelIsHide)
+            {
+                HideInformPanel();
+            }
+        }
+
+        private void SaveLeftPanelPosition()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\LayoutRobotUi" + _panelName + ".txt", false))
+                {
+                    writer.WriteLine(_settingsPanelIsHide);
+                    writer.WriteLine(_informPanelIsHide);
+
+                    writer.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        }
     }
 }

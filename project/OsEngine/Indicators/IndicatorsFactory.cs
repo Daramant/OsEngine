@@ -10,6 +10,25 @@ using OsEngine.Entity;
 
 namespace OsEngine.Indicators
 {
+    public class NamesFilesFromFolder
+    {
+        public string Folder;
+
+        public List<string> Files;
+
+        public List<string> GetFilesCopy()
+        {
+            List<string> results = new List<string>();
+
+            for(int i = 0;i < Files.Count;i++)
+            {
+                results.Add(Files[i]);
+            }
+
+            return results;
+        }
+    }
+
     public class IndicatorsFactory
     {
         public static List<string> GetIndicatorsNames()
@@ -63,8 +82,23 @@ namespace OsEngine.Indicators
             return resultTrue;
         }
 
+        private static List<NamesFilesFromFolder> _filesInDir = new List<NamesFilesFromFolder>();
+
         public static List<string> GetFullNamesFromFolder(string directory)
         {
+            for(int i = 0;i < _filesInDir.Count;i++)
+            {
+                if (_filesInDir[i] == null)
+                {
+                    continue;
+                }
+
+                if (_filesInDir[i].Folder == directory)
+                {
+                    return _filesInDir[i].GetFilesCopy();
+                }
+            }
+
             List<string> results = new List<string>();
 
             string[] subDirectories = Directory.GetDirectories(directory);
@@ -88,10 +122,15 @@ namespace OsEngine.Indicators
                 }
             }
 
-            return results;
+            NamesFilesFromFolder dir = new NamesFilesFromFolder();
+            dir.Folder = directory;
+            dir.Files = results;
+            _filesInDir.Add(dir);
+
+            return dir.GetFilesCopy();
         }
 
-        public static Aindicator CreateIndicatorByName(string nameClass, string name, bool canDelete)
+        public static Aindicator CreateIndicatorByName(string nameClass, string name, bool canDelete,StartProgram startProgram = StartProgram.IsOsTrader)
         {
             Aindicator Indicator = null;
 
@@ -104,6 +143,9 @@ namespace OsEngine.Indicators
             {
                 if (Indicator == null)
                 {
+                    if (!Directory.Exists(@"Custom\Indicators\Scripts"))
+                        Directory.CreateDirectory(@"Custom\Indicators\Scripts");
+
                     List<string> fullPaths = GetFullNamesFromFolder(@"Custom\Indicators\Scripts");
 
                     string longNameClass = nameClass + ".txt";
@@ -126,13 +168,13 @@ namespace OsEngine.Indicators
                     if (myPath == "")
                     {
                         MessageBox.Show("Error! Indicator with name " + nameClass + "not found");
-                        return null;
+                        return Indicator;
                     }
 
                     Indicator = Serialize(myPath, nameClass, name, canDelete);
                 }
 
-                Indicator.Init(name);
+                Indicator.Init(name, startProgram);
                 Indicator.CanDelete = canDelete;
             }
             catch (Exception e)
@@ -159,8 +201,6 @@ namespace OsEngine.Indicators
                 {
                     object[] param = new object[] { name };
                     Aindicator newPanel = (Aindicator)Activator.CreateInstance(_serializedInd[i].GetType());
-                    newPanel.Init(name);
-                    newPanel.CanDelete = canDelete;
                     return newPanel;
                 }
             }

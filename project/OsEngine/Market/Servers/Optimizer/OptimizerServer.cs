@@ -38,14 +38,14 @@ namespace OsEngine.Market.Servers.Optimizer
             _logMaster.Listen(this);
             _serverConnectStatus = ServerConnectStatus.Disconnect;
             ServerStatus = ServerConnectStatus.Disconnect;
-            _testerRegime = TesterRegime.Pause;
+            _testerRegime = TesterRegime.Pause; 
             TypeTesterData = TesterDataType.Candle;
             CreatePortfolio(portfolioStratValue);
             NumberServer = num;
 
             Task.Run(WorkThreadArea);
 
-            _candleManager = new CandleManager(this);
+            _candleManager = new CandleManager(this,StartProgram.IsOsOptimizer);
             _candleManager.CandleUpdateEvent += _candleManager_CandleUpdateEvent;
             _candleManager.LogMessageEvent += SendLogMessage;
             _candleManager.TypeTesterData = TypeTesterData;
@@ -117,38 +117,10 @@ namespace OsEngine.Market.Servers.Optimizer
 		/// clear server from unnecessary links
         /// очистить сервер от не нужных ссылок
         /// </summary>
-        public void Clear()
+        public void ClearDelete()
         {
-            if (_allTrades != null)
-            {
-                for (int i = 0; i < _allTrades.Length; i++)
-                {
-                    _allTrades[i].Clear();
-                }
-                _allTrades = null;
-            }
-            _candleManager.Clear();
-            _candleManager.Dispose();
-            
-            _logMaster.Clear();
-
-            _securities.Clear();
-
-            if (_candleSeriesTesterActivate != null)
-            {
-                for (int i = 0; i < _candleSeriesTesterActivate.Count; i++)
-                {
-                    _candleSeriesTesterActivate[i].Clear();
-                }
-            }
-
-            if (_myTrades != null)
-            {
-                _myTrades.Clear();
-            }
-
-            _storagePrime = null;
             _cleared = true;
+            _manualReset.Set();
         }
         private bool _cleared;
 
@@ -177,8 +149,6 @@ namespace OsEngine.Market.Servers.Optimizer
         public void TestingStart()
         {
             _serverTime = DateTime.MinValue;
-
-            ServerMaster.ClearOrders();
 
             TimeNow = _storages[0].TimeStart;
 
@@ -237,23 +207,10 @@ namespace OsEngine.Market.Servers.Optimizer
                 TestingStartEvent();
             }
 
-            if (_candleSeriesTesterActivate != null)
-            {
-                for (int i = 0; i < _candleSeriesTesterActivate.Count; i++)
-                {
-                    _candleSeriesTesterActivate[i].Clear();
-                }
-            }
-
-            _candleManager.Clear();
-
-            _allTrades = null;
-
             _dataIsActive = false;
 
-            ProfitArray = new List<decimal>();
-
             _testerRegime = TesterRegime.Play;
+            _manualReset.Set();
         }
 
         /// <summary>
@@ -301,8 +258,10 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         private TesterRegime _testerRegime;
 
+        public AutoResetEvent _manualReset = new AutoResetEvent(true);
+
         /// <summary>
-		/// work place of main thread
+        /// work place of main thread
         /// место работы основного потока
         /// </summary>
         private void WorkThreadArea()
@@ -313,18 +272,69 @@ namespace OsEngine.Market.Servers.Optimizer
                 {
                     if (_cleared)
                     {
-                        _securities = null;
-                        _storages = null;
-                        _storagePrime = null;
-                        //_candleManager.Clear();
-                        _candleManager = null;
-
-                        for (int i = 0; _candleSeriesTesterActivate != null &&
-                                        i < _candleSeriesTesterActivate.Count; i++)
+                        if (_allTrades != null)
                         {
-                            _candleSeriesTesterActivate[i].Clear();
+                            for (int i = 0; i < _allTrades.Length; i++)
+                            {
+                                _allTrades[i].Clear();
+                            }
+                            _allTrades = null;
                         }
-                        _candleSeriesTesterActivate = null;
+
+                        if (_candleManager != null)
+                        {
+                            _candleManager.Clear();
+                            _candleManager.Dispose();
+                            _candleManager.CandleUpdateEvent -= _candleManager_CandleUpdateEvent;
+                            _candleManager.LogMessageEvent -= SendLogMessage;
+                            _candleManager = null;
+                        }
+
+                        if (_logMaster != null)
+                        {
+                            _logMaster.Delete();
+                            _logMaster = null;
+                        }
+
+                        if (_securities != null)
+                        {
+                            _securities.Clear();
+                            _securities = null;
+                        }
+
+                        if (_candleSeriesTesterActivate != null)
+                        {
+                            for (int i = 0; i < _candleSeriesTesterActivate.Count; i++)
+                            {
+                                _candleSeriesTesterActivate[i].Clear();
+                                _candleSeriesTesterActivate[i].NewCandleEvent -= TesterServer_NewCandleEvent;
+                                _candleSeriesTesterActivate[i].NewTradesEvent -= TesterServer_NewTradesEvent;
+                                _candleSeriesTesterActivate[i].NewMarketDepthEvent -= TesterServer_NewMarketDepthEvent;
+                                _candleSeriesTesterActivate[i].LogMessageEvent -= SendLogMessage;
+                            }
+                            _candleSeriesTesterActivate = null;
+                        }
+
+                        if (_myTrades != null)
+                        {
+                            _myTrades.Clear();
+                            _myTrades = null;
+                        }
+
+                        _storagePrime = null;
+
+                        if (_storages != null)
+                        {
+                            _storages.Clear();
+                            _storages = null;
+                        }
+
+                        if (ProfitArray != null)
+                        {
+                            ProfitArray.Clear();
+                            ProfitArray = null;
+                        }
+
                         return;
                     }
 
@@ -338,7 +348,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
                     if (_testerRegime == TesterRegime.Pause)
                     {
-                        Thread.Sleep(1);
+                        _manualReset.WaitOne();
                         continue;
                     }
 
@@ -1101,7 +1111,7 @@ namespace OsEngine.Market.Servers.Optimizer
 		/// list with the history of portfolio movement
         /// лист с историей движения портфеля
         /// </summary>
-        public List<decimal> ProfitArray;
+        public List<decimal> ProfitArray = new List<decimal>();
 
         /// <summary>
 		/// add the change in the portfolio
@@ -1270,6 +1280,11 @@ namespace OsEngine.Market.Servers.Optimizer
         {
             lock (_starterLocker)
             {
+                if(_cleared)
+                {
+                    return null;
+                }
+
                 if (securityName == "")
                 {
                     return null;
@@ -1317,7 +1332,10 @@ namespace OsEngine.Market.Servers.Optimizer
 
                 CandleSeries series = new CandleSeries(timeFrameBuilder, security, StartProgram.IsOsOptimizer);
 
-                _candleManager.StartSeries(series);
+                if(_candleManager != null)
+                {
+                    _candleManager.StartSeries(series);
+                }
 
                 SendLogMessage(OsLocalization.Market.Message14 + series.Security.Name + 
                                OsLocalization.Market.Message15 + series.TimeFrame +
@@ -1437,7 +1455,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         public void StopThisSecurity(CandleSeries series)
         {
-            if (series != null)
+            if (series != null && _candleManager != null)
             {
                 _candleManager.StopSeries(series);
             }
@@ -1827,6 +1845,15 @@ namespace OsEngine.Market.Servers.Optimizer
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+
+        }
+
+        /// <summary>
 		/// updated order on the exchange
         /// обновился ордер на бирже
         /// </summary>
@@ -2099,6 +2126,10 @@ namespace OsEngine.Market.Servers.Optimizer
                 _lastTradeIndex = 0;
                 _lastCandleIndex = 0;
                 _lastMarketDepthIndex = 0;
+                Candles = null;
+                Trades = null;
+                MarketDepths = null;
+
             }
             catch (Exception errror)
             {
@@ -2249,6 +2280,11 @@ namespace OsEngine.Market.Servers.Optimizer
         {
             if (now > TimeEnd ||
                 now < TimeStart)
+            {
+                return;
+            }
+
+            if(Candles == null)
             {
                 return;
             }

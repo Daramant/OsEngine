@@ -2,12 +2,12 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
@@ -81,7 +81,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private void CreateDataStreams()
         {
-            _spotSocketClient = CreateUserDataStream("/" + type_str_selector + "/v1/listenKey");
+            _spotSocketClient = CreateUserDataStream();
             _wsStreams.Add("userDataStream", _spotSocketClient);
             _spotSocketClient.MessageReceived += delegate (object sender, MessageReceivedEventArgs args)
             {
@@ -109,13 +109,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// создать поток пользовательских данных
         /// </summary>
         /// <returns></returns>
-        private WebSocket CreateUserDataStream(string url)
+        private WebSocket CreateUserDataStream()
         {
             try
             {
-                var res = CreateQuery(Method.POST, url, null, false);
-
-                _listenKey = JsonConvert.DeserializeAnonymousType(res, new ListenKey()).listenKey;
+                _listenKey = CreateListenKey();
 
                 string urlStr = wss_point + "/ws/" + _listenKey;
 
@@ -133,6 +131,33 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 SendLogMessage(exception.Message, LogMessageType.Connect);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// requesting a new listenKey for web socket from Binance via sending HTTP request
+        /// запрвшиваем новый listenKey для веб сокета от Binance через отправку делаем HTTP запроса
+        /// </summary>
+        public void RenewListenKey()
+        {           
+            try
+            {
+                _listenKey = CreateListenKey();
+            }
+            catch (Exception exception)
+            {
+                SendLogMessage(exception.Message, LogMessageType.Connect);
+            }
+        }
+
+        /// <summary>
+        /// sending HTTP request to Binance to create and get new listenKey for web socket connection
+        /// делаем HTTP запрос на Binance чтобы создать и получить listenKey для веб сокета
+        /// </summary>
+        private string CreateListenKey()
+        {
+            string createListenKeyUrl = String.Format("/{0}/v1/listenKey", type_str_selector);
+            var createListenKeyResult = CreateQueryNoLock(Method.POST, createListenKeyUrl, null, false);
+            return JsonConvert.DeserializeAnonymousType(createListenKeyResult, new ListenKey()).listenKey;
         }
 
         /// <summary>
@@ -236,7 +261,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 {
                     _timeStart = DateTime.Now;
 
-                    CreateQuery(Method.PUT,
+                    CreateQueryNoLock(Method.PUT,
                         "/" + type_str_selector + "/v1/listenKey", new Dictionary<string, string>()
                             { { "listenKey=", _listenKey } }, false);
 
@@ -290,9 +315,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                     if (type_str_selector == "dapi")
                     {
-                        res = CreateQuery(Method.GET, type_str_selector + "/v1/balance", null, true);
-                        return GetAccountInfoFromDFut(res);
-
+                        res = CreateQuery(Method.GET, "/" + type_str_selector + "/v1/account", null, true);
                     }
                     else if (type_str_selector == "fapi")
                     {
@@ -324,7 +347,17 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
             AccountResponseFutures resp = new AccountResponseFutures();
 
-            List<AssetFutures> assets = JsonConvert.DeserializeAnonymousType(response, new List<AssetFutures>());
+            List<AssetFuturesCoinM> assetsCoinM = JsonConvert.DeserializeAnonymousType(response, new List<AssetFuturesCoinM>());
+
+            List<AssetFutures> assets = new List<AssetFutures>();
+
+            for(int i = 0;i < assetsCoinM.Count;i++)
+            {
+                AssetFutures futAss = new AssetFutures();
+                futAss.asset = assetsCoinM[i].asset;
+                futAss.marginBalance= assetsCoinM[i].balance;
+                assets.Add(futAss);
+            }
 
             resp.assets = assets;
             resp.positions = new List<PositionFutures>();
@@ -345,7 +378,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 {
                     NewPortfolio(resp);
                 }
-
             }
             catch (Exception ex)
             {
@@ -413,6 +445,12 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         return null;
 
                     string res = jsonCandles.Trim(new char[] { '[', ']' });
+
+                    if (string.IsNullOrEmpty(res) == true)
+                    {
+                        return null;
+                    }
+
                     var res2 = res.Split(new char[] { ']' });
 
                     _candles = new List<Candle>();
@@ -833,7 +871,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         /// <summary>
         /// method sends a request and returns a response from the server
+        /// sending of a requests is controlled by locker to avoid to many 
+        /// requests be sent at a time in case of multiple threads
         /// метод отправляет запрос и возвращает ответ от сервера
+        /// отправка запросов контроллируется локером чтобы избежать
+        /// отправки чрезмерного количества запросов на сервер в случае многих потоков
         /// </summary>
         public string CreateQuery(Method method, string endpoint, Dictionary<string, string> param = null, bool auth = false)
         {
@@ -842,82 +884,123 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 lock (_queryHttpLocker)
                 {
                     _rateGate.WaitToProceed();
-                    string fullUrl = "";
-
-                    if (param != null)
-                    {
-                        fullUrl += "?";
-
-                        foreach (var onePar in param)
-                        {
-                            fullUrl += onePar.Key + onePar.Value;
-                        }
-                    }
-
-                    if (auth)
-                    {
-                        string message = "";
-
-                        string timeStamp = GetNonce();
-
-                        message += "timestamp=" + timeStamp;
-
-                        if (fullUrl == "")
-                        {
-                            fullUrl = "?timestamp=" + timeStamp + "&signature=" + CreateSignature(message);
-                        }
-                        else
-                        {
-                            message = fullUrl + "&timestamp=" + timeStamp;
-                            fullUrl += "&timestamp=" + timeStamp + "&signature=" + CreateSignature(message.Trim('?'));
-                        }
-                    }
-
-                    var request = new RestRequest(endpoint + fullUrl, method);
-                    request.AddHeader("X-MBX-APIKEY", ApiKey);
-
-                    string baseUrl = _baseUrl;
-
-                    var response = new RestClient(baseUrl).Execute(request).Content;
-
-                    if (response.StartsWith("<!DOCTYPE"))
-                    {
-                        throw new Exception(response);
-                    }
-                    else if (response.Contains("code") && !response.Contains("code\": 200"))
-                    {
-                        var error = JsonConvert.DeserializeAnonymousType(response, new ErrorMessage());
-                        throw new Exception(error.msg);
-                    }
-
-                    return response;
+                    return PerformHttpRequest(method, endpoint, param, auth);
                 }
             }
             catch (Exception ex)
             {
-                if (ex.ToString().Contains("This listenKey does not exist"))
-                {
-                    IsConnected = false;
-                    Disconnected?.Invoke();
-                }
+                return HandleHttpRequestException(ex);
+            }
+        }
 
-                SendLogMessage(ex.ToString(), LogMessageType.Error);
+        /// <summary>
+        /// method sends a request and returns a response from the server
+        /// there is NO locker to allow some high priority requests 
+        /// be sent immediately if needed
+        /// метод отправляет запрос и возвращает ответ от сервера
+        /// в этом методе отсутствует локирование чтобы дать возможность 
+        /// в некоторых важных случаях возможность сделать незамедлительный запрос на сервер
+        /// </summary>
+        public string CreateQueryNoLock(Method method, string endpoint, Dictionary<string, string> param = null, bool auth = false)
+        {
+            try
+            {
+                return PerformHttpRequest(method, endpoint, param, auth);
+            }
+            catch (Exception ex)
+            {
+                return HandleHttpRequestException(ex);
+            }
+        }
+
+        private string PerformHttpRequest(Method method, string endpoint, Dictionary<string, string> param = null, bool auth = false)
+        {
+            string fullUrl = "";
+
+            if (param != null)
+            {
+                fullUrl += "?";
+
+                foreach (var onePar in param)
+                {
+                    fullUrl += onePar.Key + onePar.Value;
+                }
+            }
+
+            if (auth)
+            {
+                string message = "";
+
+                string timeStamp = GetNonce();
+
+                message += "timestamp=" + timeStamp;
+
+                if (fullUrl == "")
+                {
+                    fullUrl = "?timestamp=" + timeStamp + "&signature=" + CreateSignature(message);
+                }
+                else
+                {
+                    message = fullUrl + "&timestamp=" + timeStamp;
+                    fullUrl += "&timestamp=" + timeStamp + "&signature=" + CreateSignature(message.Trim('?'));
+                }
+            }
+
+            var request = new RestRequest(endpoint + fullUrl, method);
+            request.AddHeader("X-MBX-APIKEY", ApiKey);
+
+            string baseUrl = _baseUrl;
+
+            var response = new RestClient(baseUrl).Execute(request).Content;
+
+            if (response.StartsWith("<!DOCTYPE"))
+            {
+                throw new Exception(response);
+            }
+            else if (response.Contains("code") && !response.Contains("code\": 200"))
+            {
+                var error = JsonConvert.DeserializeAnonymousType(response, new ErrorMessage());
+                throw new Exception(error.msg);
+            }
+
+            return response;
+        }
+
+        private string HandleHttpRequestException(Exception ex)
+        {
+            if (ex.ToString().Contains("This listenKey does not exist"))
+            {
+                RenewListenKey();
                 return null;
             }
+            if (ex.ToString().Contains("Unknown order sent"))
+            {
+                SendLogMessage(ex.ToString(), LogMessageType.System);
+                return null;
+            }
+
+            SendLogMessage(ex.ToString(), LogMessageType.Error);
+            return null;
         }
 
         private string GetNonce()
         {
             var resTime = CreateQuery(Method.GET, "/" + type_str_selector + "/v1/time", null, false);
             var result = JsonConvert.DeserializeAnonymousType(resTime, new BinanceTime());
-            return (result.serverTime + 500).ToString();
 
-            /*DateTime yearBegin = new DateTime(1970, 1, 1);
-            var res = DateTime.UtcNow;
-            var timeStamp = DateTime.UtcNow - yearBegin;
-            var r = timeStamp.TotalMilliseconds;
-            var re = Convert.ToInt64(r);
-            return re.ToString();*/
+            if (result != null)
+            {
+                return (result.serverTime + 500).ToString();
+            }
+            else
+            {
+                DateTime yearBegin = new DateTime(1970, 1, 1);
+                var timeStamp = DateTime.UtcNow - yearBegin;
+                var r = timeStamp.TotalMilliseconds;
+                var re = Convert.ToInt64(r);
+
+                return re.ToString();
+            }
         }
 
         private string CreateSignature(string message)
@@ -1018,6 +1101,32 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         private object _lockOrder = new object();
 
+        List<Order> _canselOrders = new List<Order>();
+
+        private bool CanCanselOrder(Order order)
+        {
+            bool isInArray = false;
+
+            for(int i = 0;i < _canselOrders.Count;i++)
+            {
+                if(_canselOrders[i].NumberUser == order.NumberUser)
+                {
+                    isInArray = true;
+                    break;
+                }
+            }
+
+            if(isInArray == true)
+            {
+                return false;
+            }
+            else
+            {
+                _canselOrders.Add(order);
+                return true;
+            }
+        }
+
         /// <summary>
         /// cancel order
         /// отменить ордер
@@ -1028,13 +1137,40 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 try
                 {
+                    if(CanCanselOrder(order) == false)
+                    {
+                        Order onBoard = GetOrderState(order);
+
+                        if(onBoard == null)
+                        {
+                            order.State = OrderStateType.Cancel;
+
+                            if (MyOrderEvent != null)
+                            {
+                                MyOrderEvent(order);
+                            }
+
+                            return;
+                        }
+
+                        order.State = onBoard.State;
+                        order.NumberMarket = onBoard.NumberMarket;
+
+                        if (MyOrderEvent != null)
+                        {
+                            MyOrderEvent(order);
+                        }
+
+                        return;
+                    }
+
                     if (string.IsNullOrEmpty(order.NumberMarket))
                     {
                         Order onBoard = GetOrderState(order);
 
                         if (onBoard == null)
                         {
-                            order.State = OrderStateType.Fail;
+                            order.State = OrderStateType.Cancel;
                             SendLogMessage("При отзыве ордера не нашли такого на бирже. считаем что он уже отозван",
                                 LogMessageType.Error);
                             if (MyOrderEvent != null)
@@ -1125,7 +1261,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                             continue;
                         }
 
-                        string id = allOrders[i2].clientOrderId.Replace("x-RKXTQ2AK", "");
+                        string id = allOrders[i2].clientOrderId.Replace("x-gnrPHWyE", "");
 
                         try
                         {
@@ -1168,21 +1304,25 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         continue;
                     }
 
+                    Order newOrder = new Order();
+                    newOrder.NumberMarket = myOrder.orderId;
+                    newOrder.NumberUser = oldOpenOrders[i].NumberUser;
+                    newOrder.SecurityNameCode = oldOpenOrders[i].SecurityNameCode;
+                    newOrder.State = OrderStateType.Done;
 
-                    MyTrade trade = new MyTrade();
-                    trade.NumberOrderParent = myOrder.orderId;
-                    trade.NumberTrade = NumberGen.GetNumberOrder(StartProgram.IsOsTrader).ToString();
-                    trade.SecurityNameCode = oldOpenOrders[i].SecurityNameCode;
-                    trade.Time = new DateTime(1970, 1, 1).AddMilliseconds(Convert.ToDouble(myOrder.updateTime));
-                    trade.Side = oldOpenOrders[i].Side;
-                    trade.Price = myOrder.price.ToDecimal();
-                    trade.Volume = myOrder.executedQty.ToDecimal() - oldOpenOrders[i].VolumeExecute;
+                    newOrder.Volume = oldOpenOrders[i].Volume;
+                    newOrder.VolumeExecute = oldOpenOrders[i].VolumeExecute;
+                    newOrder.Price = oldOpenOrders[i].Price;
+                    newOrder.TypeOrder = oldOpenOrders[i].TypeOrder;
+                    newOrder.TimeCallBack = new DateTime(1970, 1, 1).AddMilliseconds(Convert.ToDouble(myOrder.updateTime));
+                    newOrder.TimeCancel = newOrder.TimeCallBack;
+                    newOrder.ServerType = ServerType.Binance;
+                    newOrder.PortfolioNumber = oldOpenOrders[i].PortfolioNumber;
 
-                    oldOpenOrders[i].SetTrade(trade);
 
-                    if (MyTradeEvent != null)
+                    if (MyOrderEvent != null)
                     {
-                        MyTradeEvent(trade);
+                        MyOrderEvent(newOrder);
                     }
                 }
                 else
@@ -1216,7 +1356,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             List<string> namesSec = new List<string>();
             namesSec.Add(oldOrder.SecurityNameCode);
 
-            string endPoint = "/" + type_str_selector + "/v1/allOrder";
+            string endPoint = "/" + type_str_selector + "/v1/allOrders";
 
             List<HistoryOrderReport> allOrders = new List<HistoryOrderReport>();
 
@@ -1245,7 +1385,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             }
 
             HistoryOrderReport orderOnBoard =
-                allOrders.Find(ord => ord.clientOrderId.Replace("x-RKXTQ2AK", "") == oldOrder.NumberUser.ToString());
+                allOrders.Find(ord => ord.clientOrderId.Replace("x-gnrPHWyE", "") == oldOrder.NumberUser.ToString());
 
             if (orderOnBoard == null)
             {
@@ -1579,6 +1719,15 @@ namespace OsEngine.Market.Servers.Binance.Futures
                                 }
                                 continue;
                             }
+
+                            else if (IsListenKeyExpiredEvent(mes))
+                            {
+                                if (ListenKeyExpiredEvent != null)
+                                {
+                                    ListenKeyExpiredEvent(this);
+                                }
+                                continue;
+                            }
                             else
                             {
 
@@ -1589,6 +1738,9 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                             //ACCOUNT_UPDATE
                             //"{\"e\":\"ACCOUNT_UPDATE\",\"T\":1579688850841,\"E\":1579688850846,\"a\":{\"B\":[{\"a\":\"USDT\",\"wb\":\"29.88018817\",\"cw\":\"29.88018817\"},{\"a\":\"BNB\",\"wb\":\"0.00000000\",\"cw\":\"0.00000000\"}],\"P\":[{\"s\":\"BTCUSDT\",\"pa\":\"0.000\",\"ep\":\"0.00000\",\"cr\":\"-0.05040000\",\"up\":\"0.00000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"ETHUSDT\",\"pa\":\"0.000\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.00000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"BCHUSDT\",\"pa\":\"0.000\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.00000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"XRPUSDT\",\"pa\":\"0.0\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"EOSUSDT\",\"pa\":\"0.0\",\"ep\":\"0.0000\",\"cr\":\"0.00000000\",\"up\":\"0.00000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"LTCUSDT\",\"pa\":\"0.000\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.00000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"TRXUSDT\",\"pa\":\"0\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.00000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"ETCUSDT\",\"pa\":\"0.00\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.0000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"LINKUSDT\",\"pa\":\"0.00\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.0000000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"},{\"s\":\"XLMUSDT\",\"pa\":\"0\",\"ep\":\"0.00000\",\"cr\":\"0.00000000\",\"up\":\"0.00000\",\"mt\":\"cross\",\"iw\":\"0.00000000\"}]}}"
+
+                            //LISTEN_KEY_EXPIRED
+                            //"{\"e\": \"listenKeyExpired\", \"E\": 1653994245400}
                         }
                     }
                     else
@@ -1606,6 +1758,31 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     SendLogMessage(exception.ToString(), LogMessageType.Error);
                 }
 
+            }
+        }
+
+        private static bool IsListenKeyExpiredEvent(string userDataMsg)
+        {
+            const string EVENT_NAME_KEY = "e";
+            const string LISTEN_KEY_EXPIRED_EVENT_NAME = "listenKeyExpired";
+            JObject userDataMsgJSON = ParseToJson(userDataMsg);
+            if (userDataMsgJSON != null && userDataMsgJSON.Property(EVENT_NAME_KEY) != null)
+            {
+                string eventName = userDataMsgJSON.Value<string>(EVENT_NAME_KEY);
+                return String.Equals(eventName, LISTEN_KEY_EXPIRED_EVENT_NAME, StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
+        }
+
+        private static JObject ParseToJson(string jsonMessage)
+        {
+            try
+            {
+                return JObject.Parse(jsonMessage);
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -1733,6 +1910,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// </summary>
         public event Action<MyTrade> MyTradeEvent;
 
+        /// <summary>
+        /// listen key which keeps socket connection alive has expired
+        /// срок действия listen key, необходимого для жизни сокет коннекшена, истек
+        /// </summary>
+        public event Action<BinanceClientFutures> ListenKeyExpiredEvent;
 
         /// <summary>
         /// portfolios updated

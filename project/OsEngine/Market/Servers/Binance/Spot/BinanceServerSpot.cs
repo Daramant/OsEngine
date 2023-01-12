@@ -161,6 +161,15 @@ namespace OsEngine.Market.Servers.Binance.Spot
         }
 
         /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+            _client.CancelAllOrders();
+        }
+
+        /// <summary>
         /// subscribe
         /// подписаться 
         /// </summary>
@@ -186,7 +195,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
                     timeFrameBuilder.TimeFrameTimeSpan,
                     actualTime, endTime);
 
-                if (candles.Count != 0 && newCandles.Count != 0)
+                if (newCandles != null && candles.Count != 0 && newCandles.Count != 0)
                 {
                     for (int i = 0; i < newCandles.Count; i++)
                     {
@@ -201,6 +210,7 @@ namespace OsEngine.Market.Servers.Binance.Spot
 
                 if (newCandles == null)
                 {
+                    actualTime = actualTime.AddDays(5);
                     continue;
                 }
 
@@ -230,6 +240,8 @@ namespace OsEngine.Market.Servers.Binance.Spot
         /// </summary>
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime lastDate)
         {
+            endTime = endTime.AddDays(1);
+
             string markerDateTime = "";
 
             List<Trade> trades = new List<Trade>();
@@ -686,10 +698,10 @@ namespace OsEngine.Market.Servers.Binance.Spot
                 }
 
                 if (sec.filters.Count > 1 &&
-                   sec.filters[2] != null &&
-                   sec.filters[2].minQty != null)
+                   sec.filters[1] != null &&
+                   sec.filters[1].minQty != null)
                 {
-                    decimal minQty = sec.filters[2].minQty.ToDecimal();
+                    decimal minQty = sec.filters[1].minQty.ToDecimal();
                     security.MinTradeAmount = minQty;
                     string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
                     if(qtyInStr.Split('.').Length > 1)

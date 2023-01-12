@@ -86,6 +86,15 @@ namespace OsEngine.Market.Servers
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// cancel all orders from trading system
+        /// отозвать все ордера из торговой системы
+        /// </summary>
+        public void CancelAllOrders()
+        {
+            throw new NotImplementedException();
+        }
+
         public virtual void Subscrible(Security security)
         {
             throw new NotImplementedException();
@@ -132,6 +141,10 @@ namespace OsEngine.Market.Servers
         public virtual event Action ConnectEvent;
         protected void OnConnectEvent()
         {
+            if (ServerStatus == ServerConnectStatus.Connect)
+            {
+                return;
+            }
             ServerStatus = ServerConnectStatus.Connect;
             ConnectEvent?.Invoke();
         }
@@ -139,6 +152,10 @@ namespace OsEngine.Market.Servers
         public event Action DisconnectEvent;
         protected void OnDisconnectEvent()
         {
+            if(ServerStatus == ServerConnectStatus.Disconnect)
+            {
+                return;
+            }
             ServerStatus = ServerConnectStatus.Disconnect;
             DisconnectEvent?.Invoke();
         }

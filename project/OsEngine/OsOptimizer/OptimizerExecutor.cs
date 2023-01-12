@@ -157,10 +157,10 @@ namespace OsEngine.OsOptimizer
 
                     StartOptimazeFazeOutOfSample(report, reportFiltred);
                 }
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
             }
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
 
             TimeSpan time = DateTime.Now - timeStart;
 
@@ -171,7 +171,6 @@ namespace OsEngine.OsOptimizer
             _primeThreadWorker = null;
 
             return;
-
         }
 
         private void StartAsuncBotFactoryInSample(int botCount, string botType, bool isScript, string faze)
@@ -622,7 +621,7 @@ namespace OsEngine.OsOptimizer
         private void StartNewBot(List<IIStrategyParameter> parametrs, List<IIStrategyParameter> paramOptimized,
             OptimazerFazeReport report, string botName)
         {
-            OptimizerServer server = CreateNewServer(report);
+            OptimizerServer server = CreateNewServer(report,true);
 
             try
             {
@@ -660,7 +659,7 @@ namespace OsEngine.OsOptimizer
 
         private List<BotPanel> _botsInTest = new List<BotPanel>();
 
-        private OptimizerServer CreateNewServer(OptimazerFazeReport report)
+        private OptimizerServer CreateNewServer(OptimazerFazeReport report,bool neadToDelete)
         {
             // 1. Create a new server for optimization. And one thread respectively
             // 1. создаём новый сервер для оптимизации. И один поток соответственно
@@ -670,7 +669,11 @@ namespace OsEngine.OsOptimizer
             _serverNum++;
             _servers.Add(server);
 
-            server.TestingEndEvent += server_TestingEndEvent;
+            if(neadToDelete)
+            {
+                server.TestingEndEvent += server_TestingEndEvent;
+            }
+            
             server.TypeTesterData = _master.Storage.TypeTesterData;
             server.TestintProgressChangeEvent += server_TestintProgressChangeEvent;
 
@@ -720,6 +723,11 @@ namespace OsEngine.OsOptimizer
                     par = parametrs[i];
                 }
 
+                if(par == null)
+                {
+                    continue;
+                }
+
                 if (par.Type == StrategyParameterType.Bool)
                 {
                     ((StrategyParameterBool)bot.Parameters[i]).ValueBool = ((StrategyParameterBool)par).ValueBool;
@@ -765,6 +773,36 @@ namespace OsEngine.OsOptimizer
                     bot.TabsSimple[i].Connector.CandleMarketDataType =
                         CandleMarketDataType.MarketDepth;
                 }
+
+                bot.TabsSimple[i].ManualPositionSupport.DoubleExitIsOn = _master.ManualControl.DoubleExitIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.DoubleExitSlipage = _master.ManualControl.DoubleExitSlipage;
+
+                bot.TabsSimple[i].ManualPositionSupport.ProfitDistance = _master.ManualControl.ProfitDistance;
+                bot.TabsSimple[i].ManualPositionSupport.ProfitIsOn = _master.ManualControl.ProfitIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.ProfitSlipage = _master.ManualControl.ProfitSlipage;
+
+                bot.TabsSimple[i].ManualPositionSupport.SecondToCloseIsOn = _master.ManualControl.SecondToCloseIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.SecondToClose = _master.ManualControl.SecondToClose;
+
+                bot.TabsSimple[i].ManualPositionSupport.SecondToOpenIsOn = _master.ManualControl.SecondToOpenIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.SecondToOpen = _master.ManualControl.SecondToOpen;
+
+                bot.TabsSimple[i].ManualPositionSupport.SetbackToCloseIsOn = _master.ManualControl.SetbackToCloseIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.SetbackToClosePosition = _master.ManualControl.SetbackToClosePosition;
+
+                bot.TabsSimple[i].ManualPositionSupport.SetbackToOpenIsOn = _master.ManualControl.SetbackToOpenIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.SetbackToOpenPosition= _master.ManualControl.SetbackToOpenPosition;
+
+                bot.TabsSimple[i].ManualPositionSupport.StopDistance = _master.ManualControl.StopDistance;
+                bot.TabsSimple[i].ManualPositionSupport.StopIsOn = _master.ManualControl.StopIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.StopSlipage= _master.ManualControl.StopSlipage;
+
+                bot.TabsSimple[i].ManualPositionSupport.ProfitDistance = _master.ManualControl.ProfitDistance;
+                bot.TabsSimple[i].ManualPositionSupport.ProfitIsOn = _master.ManualControl.ProfitIsOn;
+                bot.TabsSimple[i].ManualPositionSupport.ProfitSlipage = _master.ManualControl.ProfitSlipage;
+
+                bot.TabsSimple[i].ManualPositionSupport.TypeDoubleExitOrder = _master.ManualControl.TypeDoubleExitOrder;
+                bot.TabsSimple[i].ManualPositionSupport.ValuesType = _master.ManualControl.ValuesType;
             }
 
             for (int i = 0; _master.TabsIndexNamesAndTimeFrames != null &&
@@ -820,7 +858,7 @@ namespace OsEngine.OsOptimizer
 
         // единичный тест
 
-        public BotPanel TestBot(OptimazerFazeReport reportFaze, OptimizerReport reportToBot)
+        public BotPanel TestBot(OptimazerFazeReport reportFaze, OptimizerReport reportToBot, StartProgram startProgram)
         {
             if (_primeThreadWorker != null)
             {
@@ -830,14 +868,14 @@ namespace OsEngine.OsOptimizer
             string botName = NumberGen.GetNumberDeal(StartProgram.IsOsOptimizer).ToString();
 
             List<string> names = new List<string> { botName };
-            _asyncBotFactory.CreateNewBots(names, _master.StrategyName, _master.IsScript, StartProgram.IsTester);
+            _asyncBotFactory.CreateNewBots(names, _master.StrategyName, _master.IsScript, startProgram);
 
-            OptimizerServer server = CreateNewServer(reportFaze);
+            OptimizerServer server = CreateNewServer(reportFaze,false);
 
             List<IIStrategyParameter> parametrs = reportToBot.GetParameters();
 
             BotPanel bot = CreateNewBot(botName,
-                parametrs, parametrs, server, StartProgram.IsTester);
+                parametrs, parametrs, server, startProgram);
 
             DateTime timeStartWaiting = DateTime.Now;
 
@@ -868,8 +906,6 @@ namespace OsEngine.OsOptimizer
                     break;
                 }
             }
-
-            Thread.Sleep(2000);
 
             return bot;
         }
@@ -927,6 +963,7 @@ namespace OsEngine.OsOptimizer
                     // уничтожаем робота
                     bot.Clear();
                     bot.Delete();
+
                    _botsInTest.Remove(bot);
                 }
                 else
@@ -940,7 +977,7 @@ namespace OsEngine.OsOptimizer
                     {
                         _servers[i].TestingEndEvent -= server_TestingEndEvent;
                         _servers[i].TestintProgressChangeEvent -= server_TestintProgressChangeEvent;
-                        _servers[i].Clear();
+                        _servers[i].ClearDelete();
                         _servers.RemoveAt(i);
                         break;
                     }

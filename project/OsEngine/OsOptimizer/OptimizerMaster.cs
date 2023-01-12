@@ -13,6 +13,7 @@ using OsEngine.Market.Servers.Optimizer;
 using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels;
 using OsEngine.Robots;
+using OsEngine.OsTrader.Panels.Tab.Internal;
 
 namespace OsEngine.OsOptimizer
 {
@@ -24,13 +25,13 @@ namespace OsEngine.OsOptimizer
     {
         public OptimizerMaster()
         {
-            _log = new Log("OptimizerLog", StartProgram.IsOsOptimizer);
+            _log = new Log("OptimizerLog", StartProgram.IsTester);
             _log.Listen(this);
 
             _threadsCount = 1;
             _startDepozit = 100000;
 
-            Storage = new OptimizerDataStorage("Prime");
+            Storage = new OptimizerDataStorage("Prime",true);
             Storage.SecuritiesChangeEvent += _storage_SecuritiesChangeEvent;
             Storage.TimeChangeEvent += _storage_TimeChangeEvent;
 
@@ -46,6 +47,8 @@ namespace OsEngine.OsOptimizer
             _percentOnFilration = 30;
 
             Load();
+
+            ManualControl = new BotManualControl("OptimizerManualControl", null, StartProgram.IsOsTrader);
 
             _optimizerExecutor = new OptimizerExecutor(this);
             _optimizerExecutor.LogMessageEvent += SendLogMessage;
@@ -231,6 +234,13 @@ namespace OsEngine.OsOptimizer
         /// значение прогресса для главного прогрессБара
         /// </summary>
         public ProgressBarStatus PrimeProgressBarStatus;
+
+        public BotManualControl ManualControl; 
+
+        public void ShowManualControlDialog()
+        {
+            ManualControl.ShowDialog();
+        }
 
         // data store/хранилище данных
 
@@ -768,6 +778,16 @@ namespace OsEngine.OsOptimizer
                 Fazes.Add(newFazeOut);
             }
 
+            for(int i = 0;i < Fazes.Count;i++)
+            {
+                if(Fazes[i].Days <= 0)
+                {
+                    SendLogMessage(OsLocalization.Optimizer.Label50, LogMessageType.Error);
+                    Fazes = new List<OptimizerFaze>();
+                    return;
+                }
+            }
+
 
             /*while (DaysInFazes(Fazes) != dayAll)
             {
@@ -860,13 +880,26 @@ namespace OsEngine.OsOptimizer
                 {
                     return null;
                 }
-                _parameters = bot.Parameters;
-                bot.Delete();
 
+                if(_parameters != null)
+                {
+                    _parameters.Clear();
+                    _parameters = null;
+                }
+
+                _parameters = new List<IIStrategyParameter>();
+
+                for(int i = 0;i < bot.Parameters.Count;i++)
+                {
+                    _parameters.Add(bot.Parameters[i]);
+                }
+                
                 for(int i = 0;i < _parameters.Count;i++)
                 {
                     GetValueParameterSaveByUser(_parameters[i]);
                 }
+
+                bot.Delete();
 
                 return _parameters;
             }
@@ -1182,7 +1215,7 @@ namespace OsEngine.OsOptimizer
 
         public BotPanel TestBot(OptimazerFazeReport faze, OptimizerReport report)
         {
-            return _optimizerExecutor.TestBot(faze, report);
+            return _optimizerExecutor.TestBot(faze, report, StartProgram.IsTester);
         }
 
         // logging/логирование

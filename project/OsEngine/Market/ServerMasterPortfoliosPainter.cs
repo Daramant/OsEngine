@@ -37,6 +37,11 @@ namespace OsEngine.Market
         /// </summary>
         private void ServerMaster_ServerCreateEvent(IServer server)
         {
+            if(server.ServerType == ServerType.Optimizer)
+            {
+                return;
+            }
+
             List<IServer> servers = ServerMaster.GetServers();
 
             for (int i = 0; i < servers.Count; i++)
@@ -186,7 +191,7 @@ namespace OsEngine.Market
         {
             while (true)
             {
-               await Task.Delay(1000);
+               await Task.Delay(5000);
 
                 if (MainWindow.ProccesIsWorked == false)
                 {
@@ -278,7 +283,13 @@ namespace OsEngine.Market
 
                 for(int i = 0;i < _portfolios.Count;i++)
                 {
-                    List<PositionOnBoard> poses = _portfolios[i].GetPositionOnBoard();
+                    Portfolio port = _portfolios[i];
+
+                    if (port == null)
+                    {
+                        continue;
+                    }
+                    List<PositionOnBoard> poses = port.GetPositionOnBoard();
                     
                     while (poses != null &&
                         poses.Count > 500)
@@ -766,23 +777,30 @@ namespace OsEngine.Market
         {
             try
             {
-                if (_orders == null || _orders.Count == 0)
+                if (_orders != null)
                 {
-                    return;
-                }
-
-                for (int i = 0; i < _orders.Count; i++)
-                {
-                    if (_orders[i].State == OrderStateType.Activ &&
-                        !string.IsNullOrEmpty(_orders[i].PortfolioNumber))
+                    for (int i = 0; i < _orders.Count; i++)
                     {
-                        IServer server = ServerMaster.GetServers().Find(server1 => server1.ServerType == _orders[i].ServerType);
-                        if (server != null)
+                        if (_orders[i].State == OrderStateType.Activ &&
+                            !string.IsNullOrEmpty(_orders[i].PortfolioNumber))
                         {
-                            server.CancelOrder(_orders[i]);
+                            IServer server = ServerMaster.GetServers().Find(server1 => server1.ServerType == _orders[i].ServerType);
+                            if (server != null)
+                            {
+                                server.CancelOrder(_orders[i]);
+                            }
                         }
                     }
                 }
+
+                List<IServer> servers = ServerMaster.GetServers();
+
+                for(int i = 0; servers != null && i < servers.Count;i++)
+                {
+                    IServer server = servers[i];
+                    server.CancelAllOrders();
+                }
+
             }
             catch (Exception error)
             {

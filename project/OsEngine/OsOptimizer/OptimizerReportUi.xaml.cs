@@ -53,7 +53,9 @@ namespace OsEngine.OsOptimizer
             {
                 Title += "  " + master.TabsSimpleNamesAndTimeFrames[0].NameSecurity + "  " + master.TabsSimpleNamesAndTimeFrames[0].TimeFrame;
             }
-            
+
+            this.Activate();
+            this.Focus();
         }
 
         public void Paint(List<OptimazerFazeReport> reports)
@@ -106,7 +108,7 @@ namespace OsEngine.OsOptimizer
         /// </summary>
         private void CreateTableFazes()
         {
-            _gridFazesEnd = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect, DataGridViewAutoSizeRowsMode.None, true);
+            _gridFazesEnd = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect, DataGridViewAutoSizeRowsMode.AllCells, true);
             _gridFazesEnd.ScrollBars = ScrollBars.Vertical;
             DataGridViewTextBoxCell cell0 = new DataGridViewTextBoxCell();
             cell0.Style = _gridFazesEnd.DefaultCellStyle;
