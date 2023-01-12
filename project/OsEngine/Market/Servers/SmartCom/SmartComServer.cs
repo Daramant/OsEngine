@@ -2266,6 +2266,11 @@ namespace OsEngine.Market.Servers.SmartCom
         {
             throw new NotImplementedException();
         }
+
+        public void CancelAllOrders()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     ///// <summary>
