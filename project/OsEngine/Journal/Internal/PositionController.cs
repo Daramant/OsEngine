@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.IO;
 using System.Text;
@@ -89,10 +90,9 @@ namespace OsEngine.Journal.Internal
 
             Activate();
 
-            ControllersToCheck.Add(this);
-
             if(_startProgram != StartProgram.IsOsOptimizer)
             {
+                ControllersToCheck.Add(this);
                 Load();
             }
   
@@ -103,7 +103,6 @@ namespace OsEngine.Journal.Internal
                     position => position.State != PositionStateType.Done
                                 && position.State != PositionStateType.OpeningFail);
             }
-
         }
 
         private StartProgram _startProgram;
@@ -120,8 +119,7 @@ namespace OsEngine.Journal.Internal
         /// </summary>
         private void Load()
         {
-            if (_startProgram == StartProgram.IsOsOptimizer ||
-                _startProgram == StartProgram.IsOsMiner)
+            if (_startProgram == StartProgram.IsOsOptimizer)
             {
                 return;
             }
@@ -156,6 +154,11 @@ namespace OsEngine.Journal.Internal
                 }
 
                 if (deals.Count == 0)
+                {
+                    return;
+                }
+
+                if (_startProgram == StartProgram.IsTester)
                 {
                     return;
                 }
@@ -224,21 +227,35 @@ namespace OsEngine.Journal.Internal
                     }
                 }
 
-                for (int i = 0; i < ControllersToCheck.Count; i++)
+                if(_gridOpenDeal != null)
                 {
-                    if (ControllersToCheck[i] == null)
+                    _gridOpenDeal.Click -= _gridOpenDeal_Click;
+                    _gridOpenDeal = null;
+
+                }
+                if(_gridCloseDeal != null)
+                {
+                    _gridCloseDeal.Click -= _gridCloseDeal_Click;
+                    _gridCloseDeal = null;
+                }
+               
+                if (_startProgram != StartProgram.IsOsOptimizer)
+                {
+                    for (int i = 0; i < ControllersToCheck.Count; i++)
                     {
-                        ControllersToCheck.RemoveAt(i);
-                        i--;
-                        continue;
-                    }
-                    if (ControllersToCheck[i]._name == _name)
-                    {
-                        ControllersToCheck.RemoveAt(i);
-                        return;
+                        if (ControllersToCheck[i] == null)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            i--;
+                            continue;
+                        }
+                        if (ControllersToCheck[i]._name == _name)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            return;
+                        }
                     }
                 }
-
             }
             catch (Exception error)
             {
@@ -346,6 +363,7 @@ namespace OsEngine.Journal.Internal
             try
             {
                 string positionsString = PositionsToString();
+
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"DealController.txt", false))
                 {
                     writer.Write(positionsString);
@@ -364,7 +382,8 @@ namespace OsEngine.Journal.Internal
             result.Append(_comissionType + "\r\n");
             result.Append(_comissionValue + "\r\n");
 
-            if (_startProgram == StartProgram.IsOsTrader)
+            if (_startProgram == StartProgram.IsOsTrader ||
+                _startProgram == StartProgram.IsOsMiner)
             {
                 List<Position> deals = _deals;
 
@@ -470,13 +489,72 @@ namespace OsEngine.Journal.Internal
                 return;
             }
 
-            _deals.Remove(position);
+            // убираем в общем хранилище
+
+            for (int i = 0; i < _deals.Count; i++)
+            {
+                if (_deals[i].Number == position.Number)
+                {
+                    _deals.RemoveAt(i);
+                    break;
+                }
+            }
+
+            // убираем в хранилищах открытых позиций
 
             for (int i = 0; i < _openPositions.Count; i++)
             {
                 if (_openPositions[i].Number == position.Number)
                 {
                     _openPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _openLongPosition != null && i < _openLongPosition.Count; i++)
+            {
+                if (_openLongPosition[i].Number == position.Number)
+                {
+                    _openLongPosition.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _openShortPositions != null && i < _openShortPositions.Count; i++)
+            {
+                if (_openShortPositions[i].Number == position.Number)
+                {
+                    _openShortPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            // убираем из хранилищь закрытых позиций
+
+            for (int i = 0; _closePositions != null && i < _closePositions.Count; i++)
+            {
+                if (_closePositions[i].Number == position.Number)
+                {
+                    _closePositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _closeLongPositions != null && i < _closeLongPositions.Count; i++)
+            {
+                if (_closeLongPositions[i].Number == position.Number)
+                {
+                    _closeLongPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _closeShortPositions != null &&  i < _closeShortPositions.Count; i++)
+            {
+                if (_closeShortPositions[i].Number == position.Number)
+                {
+                    _closeShortPositions.RemoveAt(i);
+                    break;
                 }
             }
 
@@ -650,6 +728,7 @@ namespace OsEngine.Journal.Internal
                     }
 
                     ProcesPosition(position);
+                    break;
                 }
             }
             _neadToSave = true;
@@ -992,6 +1071,7 @@ namespace OsEngine.Journal.Internal
         {
             return _deals.Find(position => position.Number == number);
         }
+
         // Drawing of positions in the tables
         // прорисовка позиций в таблицах
 
@@ -1185,7 +1265,7 @@ namespace OsEngine.Journal.Internal
                 _hostOpenDeal = null;
                 _hostCloseDeal = null;
             }
-            _positionsToPaint = null;
+            _positionsToPaint.Clear();
         }
 
         /// <summary>
@@ -1646,6 +1726,14 @@ namespace OsEngine.Journal.Internal
                     return;
                 }
 
+                AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message5);
+                ui.ShowDialog();
+
+                if (ui.UserAcceptActioin == false)
+                {
+                    return;
+                }
+
                 if (UserSelectActionEvent != null)
                 {
                     UserSelectActionEvent(null, SignalType.CloseAll);
@@ -1668,6 +1756,12 @@ namespace OsEngine.Journal.Internal
                 int number;
                 try
                 {
+                    if (_gridOpenDeal.Rows == null ||
+                        _gridOpenDeal.Rows.Count == 0 ||
+                        _gridOpenDeal.CurrentCell == null)
+                    {
+                        return;
+                    }
                     number = Convert.ToInt32(_gridOpenDeal.Rows[_gridOpenDeal.CurrentCell.RowIndex].Cells[0].Value);
                 }
                 catch (Exception)
@@ -1783,6 +1877,14 @@ namespace OsEngine.Journal.Internal
         {
             try
             {
+                AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message3);
+                ui.ShowDialog();
+
+                if (ui.UserAcceptActioin == false)
+                {
+                    return;
+                }
+
                 int number;
                 try
                 {

@@ -38,6 +38,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public KalmanFilterUi(KalmanFilter indicator)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _indicator = indicator;
 
             TextBoxSharpness.Text = _indicator.Sharpness.ToString();

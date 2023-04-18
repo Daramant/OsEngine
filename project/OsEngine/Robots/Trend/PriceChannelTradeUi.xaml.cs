@@ -18,6 +18,8 @@ namespace OsEngine.Robots.Trend
         public PriceChannelTradeUi(PriceChannelTrade strategy)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _strategy = strategy;
 
             TextBoxVolumeOne.Text = _strategy.VolumeFix.ToString();

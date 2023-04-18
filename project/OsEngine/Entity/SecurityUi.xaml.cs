@@ -32,6 +32,8 @@ namespace OsEngine.Entity
         {
             _security = security;
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
 
             CultureInfo culture = new CultureInfo("ru-RU");
 

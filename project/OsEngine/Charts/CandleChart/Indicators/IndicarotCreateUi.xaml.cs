@@ -47,6 +47,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public IndicarotCreateUi(ChartCandleMaster chartMaster)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _chartMaster = chartMaster;
 
             _gridViewIndicators = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect,

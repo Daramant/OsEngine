@@ -20,6 +20,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public TickVolumeUi(TickVolume volume) // constructor//конструктор
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _volume = volume;
             ShowSettingsOnForm();
 

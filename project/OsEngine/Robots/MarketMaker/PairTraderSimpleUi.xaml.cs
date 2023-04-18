@@ -16,6 +16,8 @@ namespace OsEngine.Robots.MarketMaker
         public PairTraderSimpleUi(PairTraderSimple strategy)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _strategy = strategy;
 
             CultureInfo culture = new CultureInfo("ru-RU");

@@ -38,6 +38,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public VerticalHorizontalFilterUi(VerticalHorizontalFilter vhf)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _vhf = vhf;
 
             TextBoxLenght.Text = _vhf.Nperiod.ToString();

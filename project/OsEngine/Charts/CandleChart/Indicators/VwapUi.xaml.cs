@@ -22,6 +22,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public VwapUi(Vwap indicator)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _indicator = indicator;
 
             UseDate.IsChecked = _indicator.UseDate;

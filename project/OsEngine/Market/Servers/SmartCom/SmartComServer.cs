@@ -2271,6 +2271,16 @@ namespace OsEngine.Market.Servers.SmartCom
         {
             throw new NotImplementedException();
         }
+
+        List<Candle> IServer.GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
+        {
+            throw new NotImplementedException();
+        }
+
+        List<Trade> IServer.GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     ///// <summary>

@@ -38,6 +38,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public VolumeOscillatorUi(VolumeOscillator mA)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _mA = mA;
 
             TextBoxLenght1.Text = _mA.Lenght1.ToString();

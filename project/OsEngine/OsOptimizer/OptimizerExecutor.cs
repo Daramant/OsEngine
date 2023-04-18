@@ -666,8 +666,11 @@ namespace OsEngine.OsOptimizer
             OptimizerServer server = ServerMaster.CreateNextOptimizerServer(_master.Storage, _serverNum,
                 _master.StartDepozit);
 
-            _serverNum++;
-            _servers.Add(server);
+            lock(_serverRemoveLocker)
+            {
+                _serverNum++;
+                _servers.Add(server);
+            }
 
             if(neadToDelete)
             {
@@ -858,7 +861,8 @@ namespace OsEngine.OsOptimizer
 
         // единичный тест
 
-        public BotPanel TestBot(OptimazerFazeReport reportFaze, OptimizerReport reportToBot, StartProgram startProgram)
+        public BotPanel TestBot(OptimazerFazeReport reportFaze,
+            OptimizerReport reportToBot, StartProgram startProgram, AwaitObject awaitObj)
         {
             if (_primeThreadWorker != null)
             {
@@ -901,11 +905,13 @@ namespace OsEngine.OsOptimizer
                    bot.TabsSimple[0].TimeServerCurrent.AddHours(1) < reportFaze.Faze.TimeEnd)
             {
                 Thread.Sleep(20);
-                if (timeStartWaiting.AddSeconds(20) < DateTime.Now)
+                if (timeStartWaiting.AddSeconds(300) < DateTime.Now)
                 {
                     break;
                 }
             }
+
+            awaitObj.Dispose();
 
             return bot;
         }

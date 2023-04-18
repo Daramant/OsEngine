@@ -118,6 +118,7 @@ namespace OsEngine.OsTrader
             _riskManager.LogMessageEvent += SendNewLogMessage;
             _globalController = new GlobalPosition(_hostAllDeals, _startProgram);
             _globalController.LogMessageEvent += SendNewLogMessage;
+            _globalController.UserSelectActionEvent += _globalController_UserSelectActionEvent;
 
             _log = new Log("Prime", _startProgram);
             _log.StartPaint(hostLogPrime);
@@ -142,7 +143,22 @@ namespace OsEngine.OsTrader
             {
                 ApiMaster = new AdminApiMaster(Master);
             }
+
+            if (CriticalErrorHandler.ErrorInStartUp && CriticalErrorEvent != null)
+            {
+                try
+                {
+                    CriticalErrorEvent();
+                }
+                catch (Exception error)
+                {
+                    SendNewLogMessage($"{error.Message} {error.StackTrace}", LogMessageType.Error);
+                }
+            }
+
         }
+
+        public static event System.Action CriticalErrorEvent;
 
         public OsTraderMaster(StartProgram startProgram, WindowsFormsHost hostLogPrime)
         {
@@ -170,6 +186,7 @@ namespace OsEngine.OsTrader
             _riskManager.LogMessageEvent += SendNewLogMessage;
             _globalController = new GlobalPosition(_hostAllDeals, _startProgram);
             _globalController.LogMessageEvent += SendNewLogMessage;
+            _globalController.UserSelectActionEvent += _globalController_UserSelectActionEvent;
 
             _log = new Log("Prime", _startProgram);
             _log.StartPaint(hostLogPrime);
@@ -211,7 +228,7 @@ namespace OsEngine.OsTrader
         /// type of program that requested class creation
         /// какая программа запустила класс
         /// </summary>
-        private StartProgram _startProgram;
+        public StartProgram _startProgram;
 
         /// <summary>
         /// bots array
@@ -414,9 +431,7 @@ namespace OsEngine.OsTrader
         {
             try
             {
-
-
-                if (_activPanel != null)
+                if (_activPanel != null && _gridChart != null)
                 {
                     _activPanel.StopPaint();
                 }
@@ -475,7 +490,6 @@ namespace OsEngine.OsTrader
             }
         }
 
-        // Global Risk Manager
         // Глобальный Риск Менеджер
 
         /// <summary>
@@ -521,7 +535,6 @@ namespace OsEngine.OsTrader
             try
             {
                 _riskManager.ClearJournals();
-                _globalController.ClearJournals();
 
                 if (PanelsArray != null)
                 {
@@ -614,7 +627,6 @@ namespace OsEngine.OsTrader
         /// менеджер общей позиции роботов
         /// </summary>
         private GlobalPosition _globalController;
-
 
         private JournalUi2 _journalUi2;
 
@@ -736,6 +748,14 @@ namespace OsEngine.OsTrader
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
+        }
+
+        private void _globalController_UserSelectActionEvent(Position pos, SignalType signal)
+        {
+            for(int i = 0;i < PanelsArray.Count;i++)
+            {
+                PanelsArray[i].UserSetPositionAction(pos, signal);
+            }
         }
 
         // log / логироавние
@@ -917,6 +937,20 @@ namespace OsEngine.OsTrader
             }
         }
 
+        /// <summary>
+        /// Screenr Is Activ
+        /// Активен ли скриннер
+        /// </summary>
+        private bool TabsScreenrIsActiv()
+        {
+            if (_activPanel.TabsScreener == null ||
+                _activPanel.TabsScreener.Count == 0)
+            {
+                return false;
+            }
+            return true;
+        }
+
         // Storage Management / Управление хранилищем
 
         /// <summary>
@@ -931,6 +965,18 @@ namespace OsEngine.OsTrader
                _activPanel == null)
                 {
                     return;
+                }
+
+                if (TabsScreenrIsActiv())
+                {
+                    for (int i = 0; i < _activPanel.TabsScreener.Count; i++)
+                    {
+                        if (_activPanel.TabsScreener[i].IsLoadTabs == true)
+                        {
+                            SendNewLogMessage(OsLocalization.Trader.Label183, LogMessageType.Error);
+                            return;
+                        }
+                    }
                 }
 
                 AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Trader.Label4);

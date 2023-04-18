@@ -20,6 +20,7 @@ using ProgressBar = System.Windows.Controls.ProgressBar;
 using OsEngine.OsOptimizer.OptEntity;
 using System.Threading;
 using OsEngine.Layout;
+using System.IO;
 
 namespace OsEngine.OsOptimizer
 {
@@ -32,6 +33,7 @@ namespace OsEngine.OsOptimizer
         public OptimizerUi()
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
             Thread.Sleep(200);
 
             _master = new OptimizerMaster();
@@ -171,20 +173,20 @@ namespace OsEngine.OsOptimizer
             LabelIteartionCount.Content = OsLocalization.Optimizer.Label47;
             ButtonStrategyReload.Content = OsLocalization.Optimizer.Label48;
             ButtonResults.Content = OsLocalization.Optimizer.Label49;
+            LabelRobustnessMetric.Content = OsLocalization.Optimizer.Label53;
 
             _resultsCharting = new OptimizerReportCharting(
                 WindowsFormsHostDependences, WindowsFormsHostColumnsResults,
-                WindowsFormsHostPieResults, ComboBoxSortDependencesResults, null, null);
+                WindowsFormsHostPieResults, ComboBoxSortDependencesResults, null, null, LabelRobustnessMetric);
             _resultsCharting.LogMessageEvent += _master.SendLogMessage;
 
             this.Closing += Ui_Closing;
-
-            Task.Run(new Action(StrategyLoader));
-
             this.Activate();
             this.Focus();
 
             GlobalGUILayout.Listen(this, "optimizerUi");
+
+            Task.Run(new Action(StrategyLoader));
         }
 
         void Ui_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -500,7 +502,6 @@ namespace OsEngine.OsOptimizer
             // Проверка параметра Regime (наличие/состояние) / конец
         }
 
-
         // processing controls by clicking on them by the user/обработка контролов по нажатию их пользователем
 
         /// <summary>
@@ -533,6 +534,15 @@ namespace OsEngine.OsOptimizer
             }
             else if (ButtonGo.Content.ToString() == OsLocalization.Optimizer.Label32)
             {
+                AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Optimizer.Label51);
+
+                ui.ShowDialog();
+
+                if (!ui.UserAcceptActioin)
+                {
+                    return;
+                }
+
                 _master.Stop();
                 ButtonGo.Content = OsLocalization.Optimizer.Label9;
             }
@@ -622,6 +632,9 @@ namespace OsEngine.OsOptimizer
             PaintTableParametrs();
             PaintTableTabsIndex();
             PaintCountBotsInOptimization();
+
+            LoadTableTabsSimpleSecuritiesSettings();
+            LoadTableTabsIndexSecuritiesSettings();
         }
 
         void TextBoxStartPortfolio_TextChanged(object sender, TextChangedEventArgs e)
@@ -877,7 +890,6 @@ namespace OsEngine.OsOptimizer
         /// пользователь поменял что-то в таблице обычных вкладок робота
         /// </summary>
         void _grid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-
         {
             for (int i = 0; i < _gridTableTabsSimple.Rows.Count; i++)
             {
@@ -902,6 +914,115 @@ namespace OsEngine.OsOptimizer
             }
 
             _master.TabsSimpleNamesAndTimeFrames = _tabs;
+
+            SaveTableTabsSimpleSecuritiesSettings();
+        }
+
+        private void SaveTableTabsSimpleSecuritiesSettings()
+        {
+            string savePath = @"Engine\" + "OptimizerSettinsTabsSimpleSecurities_" + _master.StrategyName + ".txt";
+
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(savePath, false)
+                    )
+                {
+                    List<TabSimpleEndTimeFrame> _tabs = _master.TabsSimpleNamesAndTimeFrames;
+
+                    for (int i = 0; i < _tabs.Count; i++)
+                    {
+                        writer.WriteLine(_tabs[i].GetSaveString());
+                    }
+
+                    writer.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        }
+
+        private void LoadTableTabsSimpleSecuritiesSettings()
+        {
+            if (_gridTableTabsSimple.InvokeRequired)
+            {
+                _gridTableTabsSimple.Invoke(new Action(LoadTableTabsSimpleSecuritiesSettings));
+                return;
+            }
+
+            string loadPath = @"Engine\" + "OptimizerSettinsTabsSimpleSecurities_" + _master.StrategyName + ".txt";
+
+            if (!File.Exists(loadPath))
+            {
+                return;
+            }
+
+            _gridTableTabsSimple.CellValueChanged -= _grid_CellValueChanged;
+
+            try
+            {
+
+                List<TabSimpleEndTimeFrame> _tabs = new List<TabSimpleEndTimeFrame>();
+
+                using (StreamReader reader = new StreamReader(loadPath))
+                {
+                    while (reader.EndOfStream == false)
+                    {
+                        string saveStr = reader.ReadLine();
+
+                        TabSimpleEndTimeFrame newTab = new TabSimpleEndTimeFrame();
+                        newTab.SetFromString(saveStr);
+                        _tabs.Add(newTab);
+
+                        int rowIndx = _tabs.Count - 1;
+
+                        DataGridViewComboBoxCell nameCell = (DataGridViewComboBoxCell)_gridTableTabsSimple.Rows[rowIndx].Cells[1];
+
+                        for (int i = 0; nameCell.Items != null && i < nameCell.Items.Count; i++)
+                        {
+                            if (nameCell.Items[i] == null)
+                            {
+                                continue;
+                            }
+                            if (nameCell.Items[i].ToString() == newTab.NameSecurity)
+                            {
+                                nameCell.Value = newTab.NameSecurity;
+                                break;
+                            }
+                        }
+
+                        DataGridViewComboBoxCell timeFrameCell = (DataGridViewComboBoxCell)_gridTableTabsSimple.Rows[rowIndx].Cells[2];
+
+                        for (int i = 0; timeFrameCell.Items != null && i < timeFrameCell.Items.Count; i++)
+                        {
+                            if (timeFrameCell.Items[i] == null)
+                            {
+                                continue;
+                            }
+                            if (timeFrameCell.Items[i].ToString() == newTab.TimeFrame.ToString())
+                            {
+                                timeFrameCell.Value = newTab.TimeFrame.ToString();
+                                break;
+                            }
+                        }
+                    }
+
+                    reader.Close();
+                }
+                if (_tabs != null)
+                {
+                    _master.TabsSimpleNamesAndTimeFrames = _tabs;
+                }
+
+            }
+            catch (Exception)
+            {
+                //ignore
+            }
+
+            _gridTableTabsSimple.CellValueChanged += _grid_CellValueChanged;
+
         }
 
         // table of papers and time frames for indexes таблица Бумаг и таймФреймов для индексов
@@ -1022,7 +1143,78 @@ namespace OsEngine.OsOptimizer
                 if (ui.NeadToSave)
                 {
                     _master.TabsIndexNamesAndTimeFrames[e.RowIndex] = ui.Index;
+                    SaveTableTabsIndexSecuritiesSettings();
                 }
+            }
+        }
+
+        private void SaveTableTabsIndexSecuritiesSettings()
+        {
+            string savePath = @"Engine\" + "OptimizerSettinsTabsIndexSecurities_" + _master.StrategyName + ".txt";
+
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(savePath, false)
+                    )
+                {
+                    List<TabIndexEndTimeFrame> _tabs = _master.TabsIndexNamesAndTimeFrames;
+
+                    for (int i = 0; i < _tabs.Count; i++)
+                    {
+                        writer.WriteLine(_tabs[i].GetSaveString());
+                    }
+
+                    writer.Close();
+                }
+            }
+            catch (Exception)
+            {
+                // ignore
+            }
+        }
+
+        private void LoadTableTabsIndexSecuritiesSettings()
+        {
+            if (_gridTableTabsSimple.InvokeRequired)
+            {
+                _gridTableTabsSimple.Invoke(new Action(LoadTableTabsIndexSecuritiesSettings));
+                return;
+            }
+
+            string loadPath = @"Engine\" + "OptimizerSettinsTabsIndexSecurities_" + _master.StrategyName + ".txt";
+
+            if (!File.Exists(loadPath))
+            {
+                return;
+            }
+
+            try
+            {
+
+                List<TabIndexEndTimeFrame> _tabs = new List<TabIndexEndTimeFrame>();
+
+                using (StreamReader reader = new StreamReader(loadPath))
+                {
+                    while (reader.EndOfStream == false)
+                    {
+                        string saveStr = reader.ReadLine();
+
+                        TabIndexEndTimeFrame newTab = new TabIndexEndTimeFrame();
+                        newTab.SetFromString(saveStr);
+                        _tabs.Add(newTab);
+                    }
+
+                    reader.Close();
+                }
+                if (_tabs != null)
+                {
+                    _master.TabsIndexNamesAndTimeFrames = _tabs;
+                }
+
+            }
+            catch (Exception)
+            {
+                //ignore
             }
         }
 
@@ -1037,7 +1229,8 @@ namespace OsEngine.OsOptimizer
             _master.ReloadFazes();
             PaintTableOptimizeFazes();
 
-            if(_master.Fazes.Count == 0)
+            if(_master.Fazes == null ||
+                _master.Fazes.Count == 0)
             {
                 return;
             }
@@ -1248,7 +1441,7 @@ namespace OsEngine.OsOptimizer
             column1.CellTemplate = cell0;
             column1.HeaderText = OsLocalization.Optimizer.Message29;
             column1.ReadOnly = true;
-            column1.Width = 150;
+            column1.Width = 600;
 
             _gridParametrs.Columns.Add(column1);
 
@@ -1256,7 +1449,7 @@ namespace OsEngine.OsOptimizer
             column.CellTemplate = cell0;
             column.HeaderText = OsLocalization.Optimizer.Message24;
             column.ReadOnly = true;
-            column1.Width = 100;
+            column.Width = 100;
             _gridParametrs.Columns.Add(column);
 
             DataGridViewComboBoxColumn column2 = new DataGridViewComboBoxColumn();
@@ -1845,6 +2038,13 @@ namespace OsEngine.OsOptimizer
             column8.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             _gridResults.Columns.Add(column8);
 
+            DataGridViewColumn column9 = new DataGridViewColumn();
+            column9.CellTemplate = cell0;
+            column9.HeaderText = "Sharp Ratio";
+            column9.ReadOnly = false;
+            column9.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            _gridResults.Columns.Add(column9);
+
             DataGridViewButtonColumn column11 = new DataGridViewButtonColumn();
             column11.CellTemplate = new DataGridViewButtonCell();
             column11.HeaderText = OsLocalization.Optimizer.Message40;
@@ -1923,6 +2123,13 @@ namespace OsEngine.OsOptimizer
             {
                 _gridResults.Columns[9].HeaderText += " vvv";
             }
+
+            _gridResults.Columns[10].HeaderText = "Sharp Ratio";
+            if (_sortBotsType == SortBotsType.SharpRatio)
+            {
+                _gridResults.Columns[10].HeaderText += " vvv";
+            }
+
         }
 
         /// <summary>
@@ -2031,14 +2238,17 @@ namespace OsEngine.OsOptimizer
                 cell10.Value = report.Recovery;
                 row.Cells.Add(cell10);
 
-
-                DataGridViewButtonCell cell11 = new DataGridViewButtonCell();
-                cell11.Value = OsLocalization.Optimizer.Message40;
+                DataGridViewTextBoxCell cell11 = new DataGridViewTextBoxCell();
+                cell11.Value = report.SharpRatio;
                 row.Cells.Add(cell11);
 
                 DataGridViewButtonCell cell12 = new DataGridViewButtonCell();
-                cell12.Value = OsLocalization.Optimizer.Message42;
+                cell12.Value = OsLocalization.Optimizer.Message40;
                 row.Cells.Add(cell12);
+
+                DataGridViewButtonCell cell13 = new DataGridViewButtonCell();
+                cell13.Value = OsLocalization.Optimizer.Message42;
+                row.Cells.Add(cell13);
 
                 _gridResults.Rows.Add(row);
 
@@ -2112,6 +2322,11 @@ namespace OsEngine.OsOptimizer
             {
                 return true;
             }
+            else if (sortType == SortBotsType.SharpRatio &&
+                     rep1.SharpRatio < rep2.SharpRatio)
+            {
+                return true;
+            }
 
             return false;
         }
@@ -2159,6 +2374,10 @@ namespace OsEngine.OsOptimizer
             cell10.Value = report.Recovery;
             row.Cells.Add(cell10);
 
+            DataGridViewTextBoxCell cell11 = new DataGridViewTextBoxCell();
+            cell11.Value = report.SharpRatio;
+            row.Cells.Add(cell11);
+
             try
             {
                 row.Cells.Add(null);
@@ -2184,12 +2403,12 @@ namespace OsEngine.OsOptimizer
                 return;
             }
 
-            if (e.ColumnIndex == 10)
+            if (e.ColumnIndex == 11)
             {
                 ShowBotChartDialog(e);
             }
 
-            if (e.ColumnIndex == 11)
+            if (e.ColumnIndex == 12)
             {
                 ShowParamsDialog(e);
             }
@@ -2301,6 +2520,10 @@ namespace OsEngine.OsOptimizer
             {
                 _sortBotsType = SortBotsType.Recovery;
             }
+            else if (columnSelect == 10)
+            {
+                _sortBotsType = SortBotsType.SharpRatio;
+            }
             else
             {
                 return;
@@ -2339,6 +2562,8 @@ namespace OsEngine.OsOptimizer
 
         private void StrategyLoader()
         {
+            Thread.Sleep(500);
+
             _master.SendLogMessage(OsLocalization.Optimizer.Message11, LogMessageType.System);
 
             List<string> strategies = BotFactory.GetNamesStrategyWithParametersSync();
@@ -2381,5 +2606,7 @@ namespace OsEngine.OsOptimizer
         PayOffRatio,
 
         Recovery,
+
+        SharpRatio
     }
 }

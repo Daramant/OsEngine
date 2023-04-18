@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using OsEngine.Entity;
@@ -264,7 +263,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime lastDate)
         {
             endTime = endTime.AddDays(1);
-
             string markerDateTime = "";
 
             List<Trade> trades = new List<Trade>();
@@ -296,11 +294,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                 if (markerDateTime != startOver.ToShortDateString())
                 {
+                    if (startOver >= endTime)
+                    {
+                        break;
+                    }
                     markerDateTime = startOver.ToShortDateString();
                     SendLogMessage(security.Name + " Binance Futures start loading: " + markerDateTime, LogMessageType.System);
                 }
-
-                Thread.Sleep(300);
             }
 
             if (trades.Count == 0)
@@ -458,13 +458,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         return;
                     }
 
-                    var needDepth = _depths.Find(depth =>
-                        depth.SecurityNameCode == myDepth.stream.Split('@')[0].ToUpper());
+                    string secName = myDepth.stream.Split('@')[0].ToUpper();
+
+                    MarketDepth needDepth = null;
+
+                    for (int i = 0; i < _depths.Count; i++)
+                    {
+                        if (_depths[i].SecurityNameCode == secName)
+                        {
+                            needDepth = _depths[i];
+                            break;
+                        }
+                    }
 
                     if (needDepth == null)
                     {
                         needDepth = new MarketDepth();
-                        needDepth.SecurityNameCode = myDepth.stream.Split('@')[0].ToUpper();
+                        needDepth.SecurityNameCode = secName;
                         _depths.Add(needDepth);
                     }
 
@@ -786,10 +796,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     sec.filters[1].minQty != null)
                 {
                     decimal minQty = sec.filters[1].minQty.ToDecimal();
+                    security.MinTradeAmount = minQty;
                     string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
-                    if (qtyInStr.Split('.').Length > 1)
+                    if (qtyInStr.Replace(",", ".").Split('.').Length > 1)
                     {
-                        security.DecimalsVolume = qtyInStr.Split('.')[1].Length;
+                        security.DecimalsVolume = qtyInStr.Replace(",",".").Split('.')[1].Length;
                     }
                 }
 
@@ -878,7 +889,15 @@ namespace OsEngine.Market.Servers.Binance.Futures
             return security;
         }
 
-
+        // проверка ордеров на трейды
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+            if (_client == null)
+            {
+                return;
+            }
+            _client.ResearchTradesToOrders_Binance(orders);
+        }
 
         void _client_Connected()
         {

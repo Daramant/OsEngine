@@ -24,6 +24,8 @@ namespace OsEngine.OsOptimizer
         public TabIndexOptimizerUi(List<SecurityTester> securities, TabIndexEndTimeFrame index)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
 
             _securities = securities;
             CreateTable();

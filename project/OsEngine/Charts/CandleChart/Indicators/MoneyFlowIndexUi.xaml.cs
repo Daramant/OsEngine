@@ -38,6 +38,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public MoneyFlowIndexUi(MoneyFlowIndex mfi)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _mfi = mfi;
 
             TextBoxLenght.Text = _mfi.Nperiod.ToString();

@@ -45,6 +45,7 @@ using MessageBox = System.Windows.MessageBox;
 using OsEngine.Market.Servers.GateIo.Futures;
 using OsEngine.Market.Servers.Bybit;
 using OsEngine.Market.Servers.OKX;
+using OsEngine.Market.Servers.BitMaxFutures;
 
 namespace OsEngine.Market
 {
@@ -101,6 +102,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.HuobiFuturesSwap);
                 serverTypes.Add(ServerType.Bybit);
                 serverTypes.Add(ServerType.OKX);
+                serverTypes.Add(ServerType.Bitmax_AscendexFutures);
 
                 serverTypes.Add(ServerType.InteractiveBrokers);
                 serverTypes.Add(ServerType.NinjaTrader);
@@ -129,6 +131,11 @@ namespace OsEngine.Market
                 for (int i = 0; i < popularity.Count; i++)
                 {
                     if (popularity[i].ServerType == ServerType.Tester)
+                    {
+                        continue;
+                    }
+
+                    if (popularity[i].ServerType == ServerType.Finam)
                     {
                         continue;
                     }
@@ -182,6 +189,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.AscendEx_BitMax);
                 serverTypes.Add(ServerType.Binance);
                 serverTypes.Add(ServerType.BinanceFutures);
+                serverTypes.Add(ServerType.GateIoFutures);
                 serverTypes.Add(ServerType.BitMex);
                 serverTypes.Add(ServerType.BitStamp);
                 serverTypes.Add(ServerType.Bitfinex);
@@ -288,6 +296,10 @@ namespace OsEngine.Market
                 SaveMostPopularServers(type);
 
                 IServer newServer = null;
+                if (type == ServerType.Bitmax_AscendexFutures)
+                {
+                    newServer = new BitMaxFuturesServer();
+                }
                 if (type == ServerType.OKX)
                 {
                     newServer = new OkxServer();
@@ -654,6 +666,19 @@ namespace OsEngine.Market
             IServerPermission serverPermission = null;
 
 
+            if (type == ServerType.AscendEx_BitMax)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new BitmaxServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+
             if (type == ServerType.OKX)
             {
                 serverPermission = _serversPermissions.Find(s => s.ServerType == type);
@@ -908,35 +933,38 @@ namespace OsEngine.Market
         /// </summary>
         public static bool NeadToConnectAuto;
 
+        private static string _startServerLocker = "startServLocker";
+
         /// <summary>
         /// select a specific server type for connection
         /// заказать на подключение определённый тип сервера
         /// </summary>
         public static void SetNeedServer(ServerType type)
         {
-            if (_needServerTypes == null)
+            lock (_startServerLocker)
             {
-                _needServerTypes = new List<ServerType>();
-            }
-
-            try
-            {
-                for (int i = 0; i < _needServerTypes.Count; i++)
+                if (_needServerTypes == null)
                 {
-                    if (_needServerTypes[i] == type)
-                    {
-                        return;
-                    }
+                    _needServerTypes = new List<ServerType>();
                 }
 
-                _needServerTypes.Add(type);
-            }
-            catch(Exception error)
-            {
-                LogMessageEvent(error.ToString(), LogMessageType.Error);
-            }
+                try
+                {
+                    for (int i = 0; i < _needServerTypes.Count; i++)
+                    {
+                        if (_needServerTypes[i] == type)
+                        {
+                            return;
+                        }
+                    }
 
-           
+                    _needServerTypes.Add(type);
+                }
+                catch (Exception error)
+                {
+                    LogMessageEvent(error.ToString(), LogMessageType.Error);
+                }
+            }
         }
 
         /// <summary>
@@ -1322,7 +1350,11 @@ namespace OsEngine.Market
         /// <summary>
         /// OKX exchange
         /// </summary>
-        OKX
+        OKX,
 
+        /// <summary>
+        /// Ascendex exchange
+        /// </summary>
+        Bitmax_AscendexFutures
     }
 }

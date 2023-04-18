@@ -38,6 +38,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public CciUi(Cci mA)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _mA = mA;
 
             TextBoxLenght.Text = _mA.Lenght.ToString();
