@@ -872,6 +872,16 @@ position => position.State != PositionStateType.OpeningFail
             return (StrategyParameterString)LoadParameterValues(newParameter);
         }
 
+        public StrategyParameterString CreateParameter(StrategyParameterString parameter)
+        {
+            if (_parameters.Any(p => p.Name == parameter.Name))
+            {
+                throw new Exception(OsLocalization.Trader.Label52);
+            }
+
+            return (StrategyParameterString)LoadParameterValues(parameter);
+        }
+
         /// <summary>
         /// create bool type parameter / 
         /// создать параметр типа Bool
