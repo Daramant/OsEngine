@@ -124,6 +124,9 @@ namespace OsEngine.OsTrader.Gui
 
         void RobotUi_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (ApplicationBuildInfo.IsDebug)
+                return;
+
             AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Trader.Label48);
             ui.ShowDialog();
 

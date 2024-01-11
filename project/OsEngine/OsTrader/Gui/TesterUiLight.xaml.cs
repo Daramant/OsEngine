@@ -70,6 +70,9 @@ namespace OsEngine.OsTrader.Gui
 
         void TesterUi_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (ApplicationBuildInfo.IsDebug)
+                return;
+
             AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Trader.Label48);
             ui.ShowDialog();
 
