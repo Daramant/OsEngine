@@ -5,10 +5,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Threading;
-using OsEngine.Alerts;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
@@ -28,8 +25,7 @@ namespace OsEngine.Market.Connectors
     /// </summary>
     public class ConnectorCandles
     {
-        // service
-        // сервис
+        #region Service code
 
         /// <summary>
         /// constructor
@@ -50,9 +46,10 @@ namespace OsEngine.Market.Connectors
             {
                 _canSave = true;
                 Load();
+                ServerMaster.RevokeOrderToEmulatorEvent += ServerMaster_RevokeOrderToEmulatorEvent;
             }
 
-            if (createEmulator == true)
+            if (createEmulator == true && startProgram != StartProgram.IsOsOptimizer)
             {
                 _emulator = new OrderExecutionEmulator();
                 _emulator.MyTradeEvent += ConnectorBot_NewMyTradeEvent;
@@ -167,7 +164,7 @@ namespace OsEngine.Market.Connectors
         /// </summary>
         public void Delete()
         {
-          if(StartProgram != StartProgram.IsOsOptimizer)
+            if(StartProgram != StartProgram.IsOsOptimizer)
             {
                 TimeFrameBuilder.Delete();
 
@@ -175,6 +172,8 @@ namespace OsEngine.Market.Connectors
                 {
                     File.Delete(@"Engine\" + _name + @"ConnectorPrime.txt");
                 }
+
+                ServerMaster.RevokeOrderToEmulatorEvent -= ServerMaster_RevokeOrderToEmulatorEvent;
             }
 
             if (_mySeries != null)
@@ -223,8 +222,7 @@ namespace OsEngine.Market.Connectors
                 if (ServerMaster.GetServers() == null ||
                     ServerMaster.GetServers().Count == 0)
                 {
-                    AlertMessageSimpleUi uiMessage = new AlertMessageSimpleUi(OsLocalization.Market.Message1);
-                    uiMessage.Show();
+                    SendNewLogMessage(OsLocalization.Market.Message1, LogMessageType.Error);
                     return;
                 }
 
@@ -240,50 +238,84 @@ namespace OsEngine.Market.Connectors
             }
         }
 
-        private bool _lastHardReconnectOver = true;
+        #endregion
 
-        /// <summary>
-        /// принудительное переподключение
-        /// </summary>
-        public void ReconnectHard()
-        {
-            if (_lastHardReconnectOver == false)
-            {
-                return;
-            }
-
-            _lastHardReconnectOver = false;
-
-            DateTime timestart = DateTime.Now;
-
-            if (_mySeries != null)
-            {
-                _mySeries.Stop();
-                _mySeries.Clear();
-                _mySeries.СandleUpdeteEvent -= MySeries_СandleUpdeteEvent;
-                _mySeries.СandleFinishedEvent -= MySeries_СandleFinishedEvent;
-
-                if (_myServer != null)
-                {
-                    _myServer.StopThisSecurity(_mySeries);
-                }
-                _mySeries = null;
-            }
-
-            Reconnect();
-
-            _lastHardReconnectOver = true;
-        }
+        #region Settings and properties
 
         /// <summary>
         /// name of bot that owns the connector
         /// имя робота которому принадлежит коннектор
         /// </summary>
-        private string _name;
-
         public string UniqName
         {
             get { return _name; }
+        }
+        private string _name;
+
+        /// <summary>
+        /// trade server
+        /// сервер через который идёт торговля
+        /// </summary>
+        public IServer MyServer
+        {
+            get { return _myServer; }
+        }
+        private IServer _myServer;
+
+        /// <summary>
+        /// connector's server type 
+        /// тип сервера на который подписан коннектор
+        /// </summary>
+        public ServerType ServerType;
+
+        public int ServerUid;
+
+        /// <summary>
+        /// shows whether connector is connected to download data 
+        /// подключен ли коннектор на скачивание данных
+        /// </summary>
+        public bool IsConnected
+        {
+            get
+            {
+                if (_mySeries != null)
+                {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// connector is ready to send Orders / 
+        /// готов ли коннектор к выставленю заявок
+        /// </summary>
+        public bool IsReadyToTrade
+        {
+            get
+            {
+                if (_myServer == null)
+                {
+                    return false;
+                }
+
+                if (_myServer.ServerStatus != ServerConnectStatus.Connect)
+                {
+                    return false;
+                }
+
+                if (StartProgram != StartProgram.IsOsTrader)
+                { // в тестере и оптимизаторе дальше не проверяем
+                    return true;
+                }
+
+                if (_myServer.LastStartServerTime.AddSeconds(5) > DateTime.Now)
+                {
+                    return false;
+                }
+
+                return true;
+            }
         }
 
         /// <summary>
@@ -367,7 +399,7 @@ namespace OsEngine.Market.Connectors
                 {
                     if (_myServer != null)
                     {
-                        return _myServer.GetSecurityForName(_securityName,_securityClass);
+                        return _myServer.GetSecurityForName(_securityName, _securityClass);
                     }
                 }
                 catch (Exception error)
@@ -380,10 +412,93 @@ namespace OsEngine.Market.Connectors
         }
 
         /// <summary>
-        /// object preserving settings for building candles
-        /// объект сохраняющий в себе настройки для построения свечек
+        /// Does the server support market orders
         /// </summary>
-        public TimeFrameBuilder TimeFrameBuilder;
+        public bool MarketOrdersIsSupport
+        {
+            get
+            {
+                if (ServerType == ServerType.Lmax ||
+                    ServerType == ServerType.Tester ||
+                    ServerType == ServerType.Transaq ||
+                    ServerType == ServerType.BitMex)
+                {
+                    return true;
+                }
+
+                if (ServerType == ServerType.None)
+                {
+                    return false;
+                }
+
+                IServerPermission serverPermision = ServerMaster.GetServerPermission(ServerType);
+
+                if (serverPermision == null)
+                {
+                    return false;
+                }
+
+
+                return serverPermision.MarketOrdersIsSupport;
+            }
+        }
+
+        /// <summary>
+        /// Does the server support order price change
+        /// </summary>
+        public bool IsCanChangeOrderPrice
+        {
+            get
+            {
+                if (ServerType == ServerType.None)
+                {
+                    return false;
+                }
+
+                IServerPermission serverPermision = ServerMaster.GetServerPermission(ServerType);
+
+                if (serverPermision == null)
+                {
+                    return false;
+                }
+
+                return serverPermision.IsCanChangeOrderPrice;
+            }
+        }
+
+        /// <summary>
+        /// shows whether execution of trades in emulation mode is enabled
+        /// включено ли исполнение сделок в режиме эмуляции
+        /// </summary>
+        public bool EmulatorIsOn;
+
+        /// <summary>
+        /// emulator. It's for order execution in the emulation mode 
+        /// эмулятор. В нём исполняются ордера в режиме эмуляции
+        /// </summary>
+        private readonly OrderExecutionEmulator _emulator;
+
+        /// <summary>
+        /// включена ли подача событий на верх или нет
+        /// </summary>
+        public bool EventsIsOn
+        {
+            get
+            {
+                return _eventsIsOn;
+            }
+            set
+            {
+                if (_eventsIsOn == value)
+                {
+                    return;
+                }
+                _eventsIsOn = value;
+                Save();
+            }
+        }
+
+        private bool _eventsIsOn = true;
 
         /// <summary>
         /// тип комиссии для позиций
@@ -394,6 +509,27 @@ namespace OsEngine.Market.Connectors
         /// размер комиссии
         /// </summary>
         public decimal ComissionValue;
+
+        #endregion
+
+        #region Candle series settings
+
+        public CandleSeries CandleSeries
+        {
+            get { return _mySeries; }
+        }
+
+        /// <summary>
+        /// candle series that collects candles  
+        /// серия свечек которая собирает для нас свечки
+        /// </summary>
+        private CandleSeries _mySeries;
+
+        /// <summary>
+        /// object preserving settings for building candles
+        /// объект сохраняющий в себе настройки для построения свечек
+        /// </summary>
+        public TimeFrameBuilder TimeFrameBuilder;
 
         /// <summary>
         /// method of creating candles: from ticks or from depths 
@@ -459,6 +595,15 @@ namespace OsEngine.Market.Connectors
                     SendNewLogMessage(error.ToString(), LogMessageType.Error);
                 }
             }
+        }
+
+        /// <summary>
+        /// candle timeframe in the form of connector' s Timespan
+        /// ТаймФрейм свечек в виде TimeSpan на который подписан коннектор
+        /// </summary>
+        public TimeSpan TimeFrameTimeSpan
+        {
+            get { return TimeFrameBuilder.TimeFrameTimeSpan; }
         }
 
         /// <summary>
@@ -582,73 +727,6 @@ namespace OsEngine.Market.Connectors
         }
 
         /// <summary>
-        /// candle timeframe in the form of connector' s Timespan
-        /// ТаймФрейм свечек в виде TimeSpan на который подписан коннектор
-        /// </summary>
-        public TimeSpan TimeFrameTimeSpan
-        {
-            get { return TimeFrameBuilder.TimeFrameTimeSpan; }
-        }
-
-        public CandleSeries CandleSeries
-        {
-            get { return _mySeries; }
-        }
-
-        /// <summary>
-        /// candle series that collects candles  
-        /// серия свечек которая собирает для нас свечки
-        /// </summary>
-        private CandleSeries _mySeries;
-
-        /// <summary>
-        /// connector's server type 
-        /// тип сервера на который подписан коннектор
-        /// </summary>
-        public ServerType ServerType;
-
-        public int ServerUid;
-
-        /// <summary>
-        /// trade server
-        /// сервер через который идёт торговля
-        /// </summary>
-        public IServer MyServer
-        {
-            get { return _myServer; }
-        }
-        private IServer _myServer;
-
-        /// <summary>
-        /// shows whether execution of trades in emulation mode is enabled
-        /// включено ли исполнение сделок в режиме эмуляции
-        /// </summary>
-        public bool EmulatorIsOn;
-
-        /// <summary>
-        /// включена ли подача событий на верх или нет
-        /// </summary>
-        public bool EventsIsOn
-        {
-            get
-            {
-                return _eventsIsOn;
-            }
-            set
-            {
-                if (_eventsIsOn == value)
-                {
-                    return;
-                }
-                _eventsIsOn = value;
-                Save();
-            }
-        }
-
-        private bool _eventsIsOn = true;
-
-
-        /// <summary>
         /// shows whether non-trading intervals are needed
         /// нужно ли запрашивать неторговые интервалы
         /// </summary>
@@ -700,71 +778,14 @@ namespace OsEngine.Market.Connectors
             }
         }
 
-        /// <summary>
-        /// emulator. It's for order execution in the emulation mode 
-        /// эмулятор. В нём исполняются ордера в режиме эмуляции
-        /// </summary>
-        private readonly OrderExecutionEmulator _emulator;
+        #endregion
 
-        /// <summary>
-        /// shows whether connector is connected to download data 
-        /// подключен ли коннектор на скачивание данных
-        /// </summary>
-        public bool IsConnected
-        {
-            get
-            {
-                if (_mySeries != null)
-                {
-                    return true;
-                }
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// connector is ready to send Orders / 
-        /// готов ли коннектор к выставленю заявок
-        /// </summary>
-        public bool IsReadyToTrade
-        {
-            get
-            {
-                if (_myServer == null)
-                {
-                    return false;
-                }
-
-                if (_myServer.ServerStatus != ServerConnectStatus.Connect)
-                {
-                    return false;
-                }
-
-                if (StartProgram != StartProgram.IsOsTrader)
-                { // в тестере и оптимизаторе дальше не проверяем
-                    return true;
-                }
-
-                if (_myServer.LastStartServerTime.AddSeconds(60) > DateTime.Now)
-                {
-                    return false;
-                }
-
-                return true;
-            }
-        }
-
-        // data subscription
-        // подписка на данные 
+        #region Data subscription
 
         private DateTime _lastReconnectTime;
 
         private object _reconnectLocker = new object();
 
-        /// <summary>
-        /// reconnect candle downloading
-        /// переподключить скачивание свечек
-        /// </summary>
         private void Reconnect()
         {
             try
@@ -821,20 +842,44 @@ namespace OsEngine.Market.Connectors
             }
         }
 
-        /// <summary>
-        /// thread for candle subscription
-        /// поток занимающийся подпиской на свечи
-        /// </summary>
+        private bool _lastHardReconnectOver = true;
+
+        public void ReconnectHard()
+        {
+            if (_lastHardReconnectOver == false)
+            {
+                return;
+            }
+
+            _lastHardReconnectOver = false;
+
+            DateTime timestart = DateTime.Now;
+
+            if (_mySeries != null)
+            {
+                _mySeries.Stop();
+                _mySeries.Clear();
+                _mySeries.СandleUpdeteEvent -= MySeries_СandleUpdeteEvent;
+                _mySeries.СandleFinishedEvent -= MySeries_СandleFinishedEvent;
+
+                if (_myServer != null)
+                {
+                    _myServer.StopThisSecurity(_mySeries);
+                }
+                _mySeries = null;
+            }
+
+            Reconnect();
+
+            _lastHardReconnectOver = true;
+        }
+
         private bool _taskIsDead;
 
         private bool _neadToStopThread;
 
         private object _myServerLocker = new object();
 
-        /// <summary>
-        /// subscribe to receive candle
-        /// подписаться на получение свечек
-        /// </summary>
         private async void Subscrable()
         {
             try
@@ -871,7 +916,7 @@ namespace OsEngine.Market.Connectors
                     {
                         if (ServerType != ServerType.None)
                         {
-                            ServerMaster.SetNeedServer(ServerType);
+                            ServerMaster.SetServerToAutoConnection(ServerType);
                         }
                         continue;
                     }
@@ -912,7 +957,7 @@ namespace OsEngine.Market.Connectors
                     {
                         if (ServerType != ServerType.None)
                         {
-                            ServerMaster.SetNeedServer(ServerType);
+                            ServerMaster.SetServerToAutoConnection(ServerType);
                         }
                         continue;
                     }
@@ -1037,13 +1082,16 @@ namespace OsEngine.Market.Connectors
             server.NeadToReconnectEvent += _myServer_NeadToReconnectEvent;
         }
 
+        public bool NeadToLoadServerData = true;
+
         void _myServer_NeadToReconnectEvent()
         {
             Reconnect();
         }
 
-        // incoming data
-        // входящие данные
+        #endregion
+
+        #region Incoming data
 
         /// <summary>
         /// test finished
@@ -1064,6 +1112,8 @@ namespace OsEngine.Market.Connectors
             }
         }
 
+        DateTime _timeLastEndCandle = DateTime.MinValue;
+
         /// <summary>
         /// the candle has just ended
         /// свеча только что завершилась
@@ -1072,9 +1122,30 @@ namespace OsEngine.Market.Connectors
         {
             try
             {
-                if (NewCandlesChangeEvent != null && EventsIsOn == true)
+                if(EventsIsOn == false)
                 {
-                    NewCandlesChangeEvent(Candles(true));
+                    return;
+                }
+
+                List<Candle> candles = Candles(true);
+
+                if(candles == null || candles.Count == 0)
+                {
+                    return;
+                }
+
+                DateTime timeLastCandle = candles[candles.Count - 1].TimeStart;
+
+                if(timeLastCandle == _timeLastEndCandle)
+                {
+                    return;
+                }
+
+                _timeLastEndCandle = timeLastCandle;
+
+                if (NewCandlesChangeEvent != null)
+                {
+                    NewCandlesChangeEvent(candles);
                 }
             }
             catch (Exception error)
@@ -1114,6 +1185,8 @@ namespace OsEngine.Market.Connectors
                 {
                     OrderChangeEvent(order);
                 }
+
+                ServerMaster.InsertOrder(order);
             }
             catch (Exception error)
             {
@@ -1165,7 +1238,7 @@ namespace OsEngine.Market.Connectors
                 {
                     if (_emulator != null)
                     {
-                        _emulator.ProcessBidAsc(_bestBid, _bestAsk, MarketTime);
+                        _emulator.ProcessBidAsc(_bestBid, _bestAsk);
                     }
                 }
 
@@ -1179,8 +1252,6 @@ namespace OsEngine.Market.Connectors
                 SendNewLogMessage(error.ToString(), LogMessageType.Error);
             }
         }
-
-        public bool NeadToLoadServerData = true;
 
         /// <summary>
         /// incoming depth
@@ -1218,7 +1289,7 @@ namespace OsEngine.Market.Connectors
                 {
                     if(_emulator != null)
                     {
-                        _emulator.ProcessBidAsc(_bestAsk, _bestBid, MarketTime);
+                        _emulator.ProcessBidAsc(_bestAsk, _bestBid);
                     }
                 }
             }
@@ -1283,6 +1354,13 @@ namespace OsEngine.Market.Connectors
                 {
                     TimeChangeEvent(time);
                 }
+                if(EmulatorIsOn == true)
+                {
+                    if(_emulator != null)
+                    {
+                        _emulator.ProcessTime(time);
+                    }
+                }
             }
             catch (Exception error)
             {
@@ -1290,8 +1368,9 @@ namespace OsEngine.Market.Connectors
             }
         }
 
+        #endregion
 
-        // внешний интерфейс доступа к данным
+        #region Trade data access interface
 
         /// <summary>
         /// conector's ticks
@@ -1360,10 +1439,6 @@ namespace OsEngine.Market.Connectors
                 return _bestAsk;
             }
         }
-        /// <summary>
-        /// best price of seller
-        ///  лучшая цена продавца
-        /// </summary>
         private decimal _bestAsk;
 
         /// <summary>
@@ -1377,10 +1452,6 @@ namespace OsEngine.Market.Connectors
                 return _bestBid;
             }
         }
-        /// <summary>
-        /// best price of buyer 
-        /// лучшая цена покупателя
-        /// </summary>
         private decimal _bestBid;
 
         /// <summary>
@@ -1407,14 +1478,15 @@ namespace OsEngine.Market.Connectors
             }
         }
 
-        // forward orders
-        // Пересылка ордеров
+        #endregion
+
+        #region Orders
 
         /// <summary>
         /// execute order
         /// исполнить ордер
         /// </summary>
-        public void OrderExecute(Order order)
+        public void OrderExecute(Order order, bool isEmulator = false)
         {
             try
             {
@@ -1437,7 +1509,9 @@ namespace OsEngine.Market.Connectors
 
                 if (StartProgram != StartProgram.IsTester &&
                     StartProgram != StartProgram.IsOsOptimizer &&
-                    (EmulatorIsOn || _myServer.ServerType == ServerType.Finam))
+                    (EmulatorIsOn 
+                    || _myServer.ServerType == ServerType.Finam
+                    || isEmulator))
                 {
                     if(_emulator != null)
                     {
@@ -1467,10 +1541,19 @@ namespace OsEngine.Market.Connectors
                 {
                     return;
                 }
-                order.SecurityNameCode = SecurityName;
-                order.PortfolioNumber = PortfolioName;
-
-                if (EmulatorIsOn || _myServer.ServerType == ServerType.Finam)
+                if(string.IsNullOrEmpty(order.SecurityNameCode))
+                {
+                    order.SecurityNameCode = SecurityName;
+                }
+              
+                if(string.IsNullOrEmpty(order.PortfolioNumber))
+                {
+                    order.PortfolioNumber = PortfolioName;
+                }
+                
+                if (EmulatorIsOn 
+                    || _myServer.ServerType == ServerType.Finam
+                    || order.SecurityNameCode == SecurityName + " TestPaper")
                 {
                     if(_emulator != null)
                     {
@@ -1488,8 +1571,91 @@ namespace OsEngine.Market.Connectors
             }
         }
 
-        // outgoing events
-        // Исходящие события
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+            if (order == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_myServer == null)
+                {
+                    return;
+                }
+
+                if (_myServer.ServerStatus == ServerConnectStatus.Disconnect)
+                {
+                    SendNewLogMessage(OsLocalization.Market.Message2, LogMessageType.Error);
+                    return;
+                }
+
+                if(order.Volume == order.VolumeExecute 
+                    || order.State == OrderStateType.Done
+                    || order.State == OrderStateType.Fail)
+                {
+                    return;
+                }
+
+                if(EmulatorIsOn)
+                {
+                    if(_emulator.ChangeOrderPrice(order, newPrice))
+                    {
+                        if (OrderChangeEvent != null)
+                        {
+                            OrderChangeEvent(order);
+                        }
+                    }
+                }
+                else
+                {
+                    if(IsCanChangeOrderPrice == false)
+                    {
+                        SendNewLogMessage(OsLocalization.Trader.Label373, LogMessageType.Error);
+                        return;
+                    }
+
+                     _myServer.ChangeOrderPrice(order, newPrice);
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        private void ServerMaster_RevokeOrderToEmulatorEvent(Order order)
+        {
+            if (order.SecurityNameCode != SecurityName + " TestPaper"
+                && order.SecurityNameCode != SecurityName)
+            {
+                return;
+            }
+
+            if (IsConnected == false
+               || IsReadyToTrade == false)
+            {
+                SendNewLogMessage(OsLocalization.Trader.Label191, LogMessageType.Error);
+                return;
+            }
+
+            OrderCancel(order);
+        }
+
+        public void LoadOrderInOrderStorage(Order order)
+        {
+            ServerMaster.InsertOrder(order);
+        }
+
+        #endregion
+
+        #region Events
 
         /// <summary>
         /// orders are changed
@@ -1556,8 +1722,9 @@ namespace OsEngine.Market.Connectors
         /// </summary>
         public event Action<Security> SecuritySubscribeEvent;
 
-        // message log
-        // сообщения в лог 
+        #endregion
+
+        #region Log
 
         /// <summary>
         /// send new message to up
@@ -1580,6 +1747,8 @@ namespace OsEngine.Market.Connectors
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
+
+        #endregion
     }
 
     /// <summary>
@@ -1601,4 +1770,3 @@ namespace OsEngine.Market.Connectors
         Tester
     }
 }
-

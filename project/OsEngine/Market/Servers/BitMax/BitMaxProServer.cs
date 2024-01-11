@@ -102,8 +102,6 @@ namespace OsEngine.Market.Servers.BitMax
             _client.Connect();
         }
 
-
-
         /// <summary>
         /// release API
         /// освободить апи
@@ -246,6 +244,16 @@ namespace OsEngine.Market.Servers.BitMax
                 order.NumberMarket = result.Data.Info.OrderId;
                 MyOrderEvent?.Invoke(order);
             }
+        }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
         }
 
         /// <summary>
@@ -913,6 +921,16 @@ namespace OsEngine.Market.Servers.BitMax
 
         public void ResearchTradesToOrders(List<Order> orders)
         {
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

@@ -9,6 +9,7 @@ using OsEngine.Logging;
 using OsEngine.Market.Servers.Binance.Futures.Entity;
 using OsEngine.Market.Servers.Binance.Spot.BinanceSpotEntity;
 using OsEngine.Market.Servers.Entity;
+using RestSharp;
 
 namespace OsEngine.Market.Servers.Binance.Futures
 {
@@ -181,6 +182,16 @@ namespace OsEngine.Market.Servers.Binance.Futures
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel order
         /// отозвать ордер
         /// </summary>
@@ -196,6 +207,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public void CancelAllOrders()
         {
 
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+            try
+            {
+                Dictionary<string, string> param = new Dictionary<string, string>();
+
+                param.Add("symbol=", security.Name.ToUpper());
+
+                _client.CreateQuery(Method.DELETE, "/" + _client.type_str_selector + "/v1/allOpenOrders", param, true);
+            }
+            catch (Exception exeption)
+            {
+                SendLogMessage(exeption.Message, LogMessageType.Error);
+            }
+            
         }
 
         /// <summary>
@@ -711,6 +739,21 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     newPortf.ValueCurrent =
                         onePortf.marginBalance.ToDecimal();
 
+
+                    decimal lockedBalanceUSDT = 0m;
+                    if (onePortf.asset.Equals("USDT"))
+                    {
+                        
+                        foreach (var position in portfs.positions)
+                        {
+                            if (position.symbol == "USDTUSDT") continue;
+
+                            lockedBalanceUSDT += (position.initialMargin.ToDecimal() + position.maintMargin.ToDecimal());
+                        }
+                    }
+
+                    newPortf.ValueBlocked = lockedBalanceUSDT;
+
                     myPortfolio.SetNewPosition(newPortf);
                 }
 
@@ -750,11 +793,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         void _client_Disconnected()
         {
+            ServerStatus = ServerConnectStatus.Disconnect;
+
             if (DisconnectEvent != null)
             {
                 DisconnectEvent();
             }
-            ServerStatus = ServerConnectStatus.Disconnect;
+            
         }
 
         private List<Security> _securities;
@@ -774,6 +819,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 security.NameClass = sec.quoteAsset;
                 security.NameId = sec.symbol + sec.quoteAsset;
                 security.SecurityType = SecurityType.Futures;
+                security.Exchange = ServerType.BinanceFutures.ToString();
                 security.Lot = sec.filters[1].minQty.ToDecimal();
                 security.PriceStep = sec.filters[0].tickSize.ToDecimal();
                 security.PriceStepCost = security.PriceStep;
@@ -872,6 +918,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             security.Name = secName;
             security.NameFull = secName;
             security.NameClass = "FutHistory";
+            security.Exchange = ServerType.BinanceFutures.ToString();
             security.NameId = secName;
             security.SecurityType = SecurityType.Futures;
             security.Lot = sec.Lot;
@@ -901,7 +948,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         void _client_Connected()
         {
-
+            ServerStatus = ServerConnectStatus.Connect;
             //Выставить HedgeMode
             _client.SetPositionMode();
 
@@ -909,7 +956,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 ConnectEvent();
             }
-            ServerStatus = ServerConnectStatus.Connect;
+            
         }
 
         // outgoing messages
@@ -976,6 +1023,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 LogMessageEvent(message, type);
             }
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

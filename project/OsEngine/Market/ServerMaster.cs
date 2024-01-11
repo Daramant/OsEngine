@@ -21,7 +21,6 @@ using OsEngine.Market.Servers.BitMex;
 using OsEngine.Market.Servers.BitStamp;
 using OsEngine.Market.Servers.ExMo;
 using OsEngine.Market.Servers.Finam;
-using OsEngine.Market.Servers.GateIo;
 using OsEngine.Market.Servers.InteractiveBrokers;
 using OsEngine.Market.Servers.Kraken;
 using OsEngine.Market.Servers.Lmax;
@@ -30,7 +29,6 @@ using OsEngine.Market.Servers.Optimizer;
 using OsEngine.Market.Servers.Plaza;
 using OsEngine.Market.Servers.Quik;
 using OsEngine.Market.Servers.QuikLua;
-using OsEngine.Market.Servers.SmartCom;
 using OsEngine.Market.Servers.Tester;
 using OsEngine.Market.Servers.Transaq;
 using OsEngine.Market.Servers.ZB;
@@ -46,6 +44,12 @@ using OsEngine.Market.Servers.GateIo.Futures;
 using OsEngine.Market.Servers.Bybit;
 using OsEngine.Market.Servers.OKX;
 using OsEngine.Market.Servers.BitMaxFutures;
+using OsEngine.Market.Servers.BybitSpot;
+using OsEngine.Market.Servers.BitGet.BitGetSpot;
+using OsEngine.Market.Servers.BitGet.BitGetFutures;
+using OsEngine.Market.Servers.Alor;
+using OsEngine.Market.Servers.GateIo.GateIoSpot;
+using OsEngine.Market.Servers.GateIo.GateIoFutures;
 
 namespace OsEngine.Market
 {
@@ -56,18 +60,89 @@ namespace OsEngine.Market
     public class ServerMaster
     {
 
-// service
-// сервис
+        #region Service
+
+        /// <summary>
+        /// show settings
+        /// </summary>
+        public static void ShowDialog(bool isTester)
+        {
+            if (_ui == null)
+            {
+                _ui = new ServerMasterUi(isTester);
+
+                try
+                {
+                    _ui.Show();
+                    _ui.Closing += (sender, args) => { _ui = null; };
+                }
+                catch
+                {
+                    _ui = null;
+                }
+
+            }
+            else
+            {
+                _ui.Activate();
+            }
+        }
+
+        private static ServerMasterUi _ui;
+
+        /// <summary>
+        /// save settings
+        /// </summary>
+        public static void Save()
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + @"ServerMaster.txt", false))
+                {
+                    writer.WriteLine(NeadToConnectAuto);
+                    writer.Close();
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        /// <summary>
+        /// upload settings
+        /// </summary>
+        public static void Load()
+        {
+            if (!File.Exists(@"Engine\" + @"ServerMaster.txt"))
+            {
+                return;
+            }
+            try
+            {
+                using (StreamReader reader = new StreamReader(@"Engine\" + @"ServerMaster.txt"))
+                {
+                    NeadToConnectAuto = Convert.ToBoolean(reader.ReadLine());
+                    reader.Close();
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+        }
+
+        #endregion
+
+        #region Creating and storing servers
 
         /// <summary>
         /// array of deployed servers
-        /// массив развёрнутых серверов
         /// </summary>
         private static List<IServer> _servers;
 
         /// <summary>
         /// take trade server typre from system
-        /// взять типы торговых серверов в системе
         /// </summary>
         public static List<ServerType> ServersTypes
         {
@@ -75,9 +150,9 @@ namespace OsEngine.Market
             {
                 List<ServerType> serverTypes = new List<ServerType>();
 
+                serverTypes.Add(ServerType.Alor);
                 serverTypes.Add(ServerType.QuikDde);
                 serverTypes.Add(ServerType.QuikLua);
-                serverTypes.Add(ServerType.SmartCom);
                 serverTypes.Add(ServerType.Plaza);
                 serverTypes.Add(ServerType.Transaq);
                 serverTypes.Add(ServerType.Tinkoff);
@@ -85,7 +160,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.MoexDataServer);
                 serverTypes.Add(ServerType.MfdWeb);
 
-                serverTypes.Add(ServerType.GateIo);
+                serverTypes.Add(ServerType.GateIoSpot);
                 serverTypes.Add(ServerType.GateIoFutures);
                 serverTypes.Add(ServerType.AscendEx_BitMax);
                 serverTypes.Add(ServerType.Binance);
@@ -101,8 +176,11 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.HuobiFutures);
                 serverTypes.Add(ServerType.HuobiFuturesSwap);
                 serverTypes.Add(ServerType.Bybit);
+                serverTypes.Add(ServerType.BybitSpot);
                 serverTypes.Add(ServerType.OKX);
                 serverTypes.Add(ServerType.Bitmax_AscendexFutures);
+                serverTypes.Add(ServerType.BitGetSpot);
+                serverTypes.Add(ServerType.BitGetFutures);
 
                 serverTypes.Add(ServerType.InteractiveBrokers);
                 serverTypes.Add(ServerType.NinjaTrader);
@@ -113,7 +191,7 @@ namespace OsEngine.Market
 
                 // а теперь сортируем в зависимости от предпочтений пользователя
 
-                List<ServerPop> popularity = MostPopularServersWithCount();
+                List<ServerPop> popularity = LoadMostPopularServersWithCount();
 
                 for (int i = 0; i < popularity.Count; i++)
                 {
@@ -174,7 +252,6 @@ namespace OsEngine.Market
 
         /// <summary>
         /// take trade server typre from system
-        /// взять типы торговых серверов в системе
         /// </summary>
         public static List<ServerType> ServersTypesToOsData
         {
@@ -182,6 +259,7 @@ namespace OsEngine.Market
             {
                 List<ServerType> serverTypes = new List<ServerType>();
 
+                serverTypes.Add(ServerType.Alor);
                 serverTypes.Add(ServerType.Finam);
                 serverTypes.Add(ServerType.MoexDataServer);
                 serverTypes.Add(ServerType.MfdWeb);
@@ -195,6 +273,7 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.Bitfinex);
                 serverTypes.Add(ServerType.Kraken);
                 serverTypes.Add(ServerType.Exmo);
+                serverTypes.Add(ServerType.BybitSpot);
                 serverTypes.Add(ServerType.HuobiSpot);
                 serverTypes.Add(ServerType.HuobiFutures);
                 serverTypes.Add(ServerType.HuobiFuturesSwap);
@@ -205,11 +284,25 @@ namespace OsEngine.Market
             }
         }
 
+        /// <summary>
+        /// are there any active servers
+        /// </summary>
         public static bool HasActiveServers()
         {
             return _servers != null && _servers.Count > 0;
         }
 
+        /// <summary>
+        /// array of active servers
+        /// </summary>
+        public static List<IServer> GetServers()
+        {
+            return _servers;
+        }
+
+        /// <summary>
+        /// array of active servers types
+        /// </summary>
         public static List<ServerType> ActiveServersTypes
         {
             get
@@ -227,7 +320,6 @@ namespace OsEngine.Market
 
         /// <summary>
         /// disable all servers
-        /// отключить все сервера
         /// </summary>
         public static void AbortAll()
         {
@@ -245,37 +337,7 @@ namespace OsEngine.Market
         }
 
         /// <summary>
-        /// show settings
-        /// показать настройки
-        /// </summary>
-        public static void ShowDialog(bool isTester)
-        {
-            if (_ui == null)
-            {
-                _ui = new ServerMasterUi(isTester);
-
-                try
-                {
-                    _ui.Show();
-                    _ui.Closing += (sender, args) => { _ui = null; };
-                }
-                catch
-                {
-                    _ui = null;
-                }
-
-            }
-            else
-            {
-                _ui.Activate();
-            }
-        }
-
-        private static ServerMasterUi _ui;
-
-        /// <summary>
         /// create server
-        /// создать сервер
         /// </summary>
         /// <param name="type"> server type / тип сервера </param>
         /// <param name="neadLoadTicks"> shows whether upload ticks from storage. this is need for bots with QUIK or Plaza2 servers / нужно ли подгружать тики из хранилища. Актуально в режиме робота для серверов Квик, Плаза 2 </param>
@@ -296,9 +358,25 @@ namespace OsEngine.Market
                 SaveMostPopularServers(type);
 
                 IServer newServer = null;
+                if (type == ServerType.Alor)
+                {
+                    newServer = new AlorServer();
+                }
+                if (type == ServerType.BitGetFutures)
+                {
+                    newServer = new BitGetServerFutures();
+                }
+                if (type == ServerType.BitGetSpot)
+                {
+                    newServer = new BitGetServerSpot();
+                }
                 if (type == ServerType.Bitmax_AscendexFutures)
                 {
                     newServer = new BitMaxFuturesServer();
+                }
+                if (type == ServerType.BybitSpot)
+                {
+                    newServer = new BybitSpotServer();
                 }
                 if (type == ServerType.OKX)
                 {
@@ -332,13 +410,13 @@ namespace OsEngine.Market
                 {
                     newServer = new HitbtcServer();
                 }
-                if (type == ServerType.GateIo)
+                if (type == ServerType.GateIoSpot)
                 {
-                    newServer = new GateIoServer();
+                    newServer = new GateIoServerSpot();
                 }
                 if (type == ServerType.GateIoFutures)
                 {
-                    newServer = new GateIoFuturesServer();
+                    newServer = new GateIoServerFutures();
                 }
                 if (type == ServerType.Bybit)
                 {
@@ -404,10 +482,6 @@ namespace OsEngine.Market
                 {
                     newServer = new InteractiveBrokersServer();
                 }
-                else if (type == ServerType.SmartCom)
-                {
-                    newServer = new SmartComServer();
-                }
                 else if (type == ServerType.Plaza)
                 {
                     newServer = new PlazaServer();
@@ -445,9 +519,12 @@ namespace OsEngine.Market
             }
         }
 
+        /// <summary>
+        /// save the types of servers that are most often run by the user
+        /// </summary>
         private static void SaveMostPopularServers(ServerType type)
         {
-            List<ServerPop> servers = MostPopularServersWithCount();
+            List<ServerPop> servers = LoadMostPopularServersWithCount();
 
             bool isInArray = false;
 
@@ -506,7 +583,10 @@ namespace OsEngine.Market
             }
         }
 
-        public static List<ServerPop> MostPopularServersWithCount()
+        /// <summary>
+        /// load the types of servers that are most often run by the user
+        /// </summary>
+        public static List<ServerPop> LoadMostPopularServersWithCount()
         {
             List<ServerPop> servers = new List<ServerPop>();
 
@@ -570,9 +650,9 @@ namespace OsEngine.Market
 
         /// <summary>
         /// create a new optimization server
-        /// создать новый сервер оптимизации
         /// </summary>
-        public static OptimizerServer CreateNextOptimizerServer(OptimizerDataStorage storage, int num, decimal portfolioStartVal)
+        public static OptimizerServer CreateNextOptimizerServer(OptimizerDataStorage storage,
+            int num, decimal portfolioStartVal)
         {
 
             OptimizerServer serv = new OptimizerServer(storage, num, portfolioStartVal);
@@ -619,6 +699,9 @@ namespace OsEngine.Market
             }
         }
 
+        /// <summary>
+        /// delete server to optimize by number
+        /// </summary>
         public static void RemoveOptimizerServer(OptimizerServer server)
         {
             server.ClearDelete();
@@ -643,235 +726,16 @@ namespace OsEngine.Market
         }
 
         /// <summary>
-        /// take the server
-        /// взять сервер
-        /// </summary>
-        public static List<IServer> GetServers()
-        {
-            return _servers;
-        }
-
-        /// <summary>
         /// new server created
-        /// создан новый сервер
         /// </summary>
         public static event Action<IServer> ServerCreateEvent;
 
-        // доступ к разрешениям для серверов
+        #endregion
 
-        private static List<IServerPermission> _serversPermissions = new List<IServerPermission>();
-
-        public static IServerPermission GetServerPermission(ServerType type)
-        {
-            IServerPermission serverPermission = null;
-
-
-            if (type == ServerType.AscendEx_BitMax)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new BitmaxServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-
-            if (type == ServerType.OKX)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new OkxServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Binance)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new BinanceSpotServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.BinanceFutures)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new BinanceFuturesServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Bitfinex)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new BitFinexServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Kraken)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new KrakenServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-
-            if (type == ServerType.MoexDataServer)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new MoexIssPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.MfdWeb)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new MfdServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Finam)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new FinamServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Tinkoff)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new TinkoffServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.HuobiSpot)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new HuobiSpotServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.HuobiFutures)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new HuobiFuturesServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.HuobiFuturesSwap)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new HuobiFuturesSwapServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.GateIoFutures)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new GateIoFuturesServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.Bybit)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new BybitServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-            if (type == ServerType.InteractiveBrokers)
-            {
-                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
-
-                if (serverPermission == null)
-                {
-                    serverPermission = new InteractiveBrokersServerPermission();
-                    _serversPermissions.Add(serverPermission);
-                }
-
-                return serverPermission;
-            }
-
-            
-
-            return null;
-        }
-
-        
-        // создание серверов автоматически creating servers automatically 
+        #region Automatic creation servers
 
         /// <summary>
-        /// upload server settings
-        /// загрузить настройки сервера
+        /// activate automatic server deployment
         /// </summary>
         public static void ActivateAutoConnection()
         {
@@ -881,65 +745,17 @@ namespace OsEngine.Market
             task.Start();
         }
 
-        private static ServerMasterPortfoliosPainter _painter;
-
-        /// <summary>
-        /// save settings
-        /// сохранить настройки
-        /// </summary>
-        public static void Save()
-        {
-            try
-            {
-                using (StreamWriter writer = new StreamWriter(@"Engine\" + @"ServerMaster.txt", false))
-                {
-                    writer.WriteLine(NeadToConnectAuto);
-                    writer.Close();
-                }
-            }
-            catch (Exception error)
-            {
-                SendNewLogMessage(error.ToString(), LogMessageType.Error);
-            }
-        }
-
-        /// <summary>
-        /// upload settings
-        /// загрузить настройки
-        /// </summary>
-        public static void Load()
-        {
-            if (!File.Exists(@"Engine\" + @"ServerMaster.txt"))
-            {
-                return;
-            }
-            try
-            {
-                using (StreamReader reader = new StreamReader(@"Engine\" + @"ServerMaster.txt"))
-                {
-                    NeadToConnectAuto = Convert.ToBoolean(reader.ReadLine());
-                    reader.Close();
-                }
-            }
-            catch (Exception error)
-            {
-                SendNewLogMessage(error.ToString(), LogMessageType.Error);
-            }
-        }
-
         /// <summary>
         /// shows whether the server-master can be deployed in automatic mode  
-        /// можно ли сервер мастеру разворачивать сервера в автоматическом режиме
         /// </summary>
         public static bool NeadToConnectAuto;
 
         private static string _startServerLocker = "startServLocker";
 
         /// <summary>
-        /// select a specific server type for connection
-        /// заказать на подключение определённый тип сервера
+        /// select a specific server type for auto connection
         /// </summary>
-        public static void SetNeedServer(ServerType type)
+        public static void SetServerToAutoConnection(ServerType type)
         {
             lock (_startServerLocker)
             {
@@ -968,20 +784,17 @@ namespace OsEngine.Market
         }
 
         /// <summary>
-        /// selected bot servers
-        /// сервера, которые заказали роботы
+        /// selected bot servers for auto connection
         /// </summary>
         private static List<ServerType> _needServerTypes;
 
         /// <summary>
         /// servers that we have already treid to connect
-        /// серверы которые мы уже пытались подключить
         /// </summary>
         private static List<ServerType> _tryActivateServerTypes;
 
         /// <summary>
         /// work place of the thread that connects our servers in auto mode
-        /// место работы потока который подключает наши сервера в авто режиме
         /// </summary>
         private static async void ThreadStarterWorkArea()
         {
@@ -1018,10 +831,9 @@ namespace OsEngine.Market
                 }
             }
         }
-        
+
         /// <summary>
         /// try running this server
-        /// Попробовать запустить данный сервер
         /// </summary>
         private static void TryStartThisSevrverInAutoType(ServerType type)
         {
@@ -1037,7 +849,7 @@ namespace OsEngine.Market
 
             if (GetServers() == null || GetServers().Find(server1 => server1.ServerType == type) == null)
             { // if we don't have our server, create a new one / если у нас нашего сервера нет - создаём его
-                CreateServer(type,true);
+                CreateServer(type, true);
             }
 
             List<IServer> servers = GetServers();
@@ -1060,54 +872,264 @@ namespace OsEngine.Market
             }
         }
 
-// access to the portfolio and its drawing
-// доступ к портфелю и его прорисовка
+        #endregion
+
+        #region Access to servers permissions
+
+        /// <summary>
+        /// array of previously created permissions for servers
+        /// </summary>
+        private static List<IServerPermission> _serversPermissions = new List<IServerPermission>();
+
+        /// <summary>
+        /// array of servers types for which there are no implementations IserverPermission
+        /// </summary>
+        private static List<ServerType> _noServerPermissionServers = new List<ServerType>();
+
+        /// <summary>
+        /// object blocking multithreaded access to the functions of creating permission objects.
+        /// </summary>
+        private static string _serverPermissionGeterLocker = "serverPermissionLocker";
+
+        /// <summary>
+        /// request server permissions of the type
+        /// </summary>
+        public static IServerPermission GetServerPermission(ServerType type)
+        {
+            for(int i = 0;i < _serversPermissions.Count;i++)
+            {
+                if (_serversPermissions[i].ServerType == type)
+                {
+                    return _serversPermissions[i];
+                }
+            }
+
+            for(int i = 0;i < _noServerPermissionServers.Count;i++)
+            {
+                if (_noServerPermissionServers[i] == type)
+                {
+                    return null;
+                }
+            }
+
+            lock(_serverPermissionGeterLocker)
+            {
+                for (int i = 0; i < _serversPermissions.Count; i++)
+                {
+                    if (_serversPermissions[i].ServerType == type)
+                    {
+                        return _serversPermissions[i];
+                    }
+                }
+
+                for (int i = 0; i < _noServerPermissionServers.Count; i++)
+                {
+                    if (_noServerPermissionServers[i] == type)
+                    {
+                        return null;
+                    }
+                }
+
+                IServerPermission serverPermission = null;
+
+                if (type == ServerType.Alor)
+                {
+                    serverPermission = new AlorServerPermission();
+                }
+                else if (type == ServerType.BitGetSpot)
+                {
+                    serverPermission = new BitGetSpotServerPermission();
+                }
+                else if (type == ServerType.BitGetFutures)
+                {
+                    serverPermission = new BitGetFuturesServerPermission();
+                }
+                else if (type == ServerType.AscendEx_BitMax)
+                {
+                    serverPermission = new BitmaxServerPermission();
+                }
+                else if (type == ServerType.OKX)
+                {
+                    serverPermission = new OkxServerPermission();
+                }
+                else if (type == ServerType.Binance)
+                {
+                    serverPermission = new BinanceSpotServerPermission();
+                }
+                else if (type == ServerType.BinanceFutures)
+                {
+                    serverPermission = new BinanceFuturesServerPermission();
+                }
+                else if (type == ServerType.Bitfinex)
+                {
+                    serverPermission = new BitFinexServerPermission();
+                }
+                else if (type == ServerType.Kraken)
+                {
+                    serverPermission = new KrakenServerPermission();
+                }
+                else if (type == ServerType.MoexDataServer)
+                {
+                    serverPermission = new MoexIssPermission();
+                }
+                else if (type == ServerType.MfdWeb)
+                {
+                    serverPermission = new MfdServerPermission();
+                }
+                else if (type == ServerType.Finam)
+                {
+                    serverPermission = new FinamServerPermission();
+                }
+                else if (type == ServerType.Tinkoff)
+                {
+                    serverPermission = new TinkoffServerPermission();
+                }
+                else if (type == ServerType.HuobiSpot)
+                {
+                    serverPermission = new HuobiSpotServerPermission();
+                }
+                else if (type == ServerType.HuobiFutures)
+                {
+                    serverPermission = new HuobiFuturesServerPermission();
+                }
+                else if (type == ServerType.BybitSpot)
+                {
+                    serverPermission = new BybitSpotServerPermission();
+                }
+                else if (type == ServerType.HuobiFuturesSwap)
+                {
+                    serverPermission = new HuobiFuturesSwapServerPermission();
+                }
+                else if (type == ServerType.GateIoFutures)
+                {
+                    serverPermission = new GateIoServerFuturesPermission();
+                }
+                else if (type == ServerType.GateIoSpot)
+                {
+                    serverPermission = new GateIoSpotServerPermission();
+                }
+                else if (type == ServerType.Bybit)
+                {
+                    serverPermission = new BybitServerPermission();
+                }
+                else if (type == ServerType.InteractiveBrokers)
+                {
+                    serverPermission = new InteractiveBrokersServerPermission();
+                }
+
+                if (serverPermission != null)
+                {
+                    _serversPermissions.Add(serverPermission);
+                    return serverPermission;
+                }
+                else
+                {
+                    _noServerPermissionServers.Add(type);
+                }
+            }
+
+            return null;
+        }
+
+        #endregion
+
+        #region Access to portfolio, orders and its drawing
 
         /// <summary>
         /// start to draw class controls
-        /// начать прорисовывать контролы класса 
         /// </summary>
         public static void StartPaint()
         {
-             _painter.StartPaint();
+             _painterPortfolios.StartPaint();
+            _ordersStorage.StartPaint();
         }
 
         /// <summary>
         /// stop to draw class controls
-        /// остановить прорисовку контролов класса 
         /// </summary>
         public static void StopPaint()
         {
-            _painter.StopPaint();
+            _painterPortfolios.StopPaint();
+            _ordersStorage.StopPaint();
         }
+
+        private static ServerMasterPortfoliosPainter _painterPortfolios;
+
+        private static ServerMasterOrdersPainter _ordersStorage;
 
         /// <summary>
         /// clear the order list in the table
-        /// очистить список ордеров в таблицах
         /// </summary>
         public static void ClearOrders()
         {
-            if (_painter == null)
+            if (_painterPortfolios == null)
             {
                 return;
             }
-            _painter.ClearOrders();
+            _ordersStorage.ClearOrders();
         }
 
         /// <summary>
         /// add items on which portfolios and orders will be drawn
-        /// добавить элементы, на котором будут прорисовываться портфели и ордера
         /// </summary>
-        public static void SetHostTable(WindowsFormsHost hostPortfolio, WindowsFormsHost hostOrders)
+        public static void SetHostTable(WindowsFormsHost hostPortfolio, WindowsFormsHost hostActiveOrders, 
+            WindowsFormsHost hostHistoricalOrders)
         {
-            _painter = new ServerMasterPortfoliosPainter();
-            _painter.LogMessageEvent += SendNewLogMessage;
-            _painter.SetHostTable(hostPortfolio, hostOrders);
+            if (_painterPortfolios == null)
+            {
+                _painterPortfolios = new ServerMasterPortfoliosPainter();
+                _painterPortfolios.LogMessageEvent += SendNewLogMessage;
+                _painterPortfolios.ClearPositionOnBoardEvent += _painterPortfolios_ClearPositionOnBoardEvent;
+                _painterPortfolios.SetHostTable(hostPortfolio);
+            }
+
+            if(_ordersStorage == null)
+            {
+                _ordersStorage = new ServerMasterOrdersPainter();
+                _ordersStorage.LogMessageEvent += SendNewLogMessage;
+                _ordersStorage.SetHostTable(hostActiveOrders, hostHistoricalOrders);
+                _ordersStorage.RevokeOrderToEmulatorEvent += _ordersStorage_RevokeOrderToEmulatorEvent;
+            }
         }
 
-// log messages
-// сообщения в лог
+        /// <summary>
+        /// add a draw order 
+        /// </summary>
+        public static void InsertOrder(Order order)
+        {
+            if (_ordersStorage != null)
+            {
+                _ordersStorage.InsertOrder(order);
+            }
+        }
 
+        private static void _painterPortfolios_ClearPositionOnBoardEvent(string sec, IServer server, string fullName)
+        {
+            if(ClearPositionOnBoardEvent != null)
+            {
+                ClearPositionOnBoardEvent(sec, server, fullName);
+            }
+        }
+
+        private static void _ordersStorage_RevokeOrderToEmulatorEvent(Order order)
+        {
+            if(RevokeOrderToEmulatorEvent != null)
+            {
+                RevokeOrderToEmulatorEvent(order);
+            }
+        }
+
+        public static event Action<Order> RevokeOrderToEmulatorEvent;
+
+        public static event Action<string, IServer, string> ClearPositionOnBoardEvent;
+
+        #endregion
+
+        #region Log
+
+        /// <summary>
+        /// enable object logging
+        /// </summary>
         public static void ActivateLogging()
         {
             if (Log == null)
@@ -1117,11 +1139,13 @@ namespace OsEngine.Market
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
         public static Log Log;
 
         /// <summary>
         /// send new message to up
-        /// выслать новое сообщение на верх
         /// </summary>
         private static void SendNewLogMessage(string message, LogMessageType type)
         {
@@ -1130,16 +1154,18 @@ namespace OsEngine.Market
                 LogMessageEvent(message, type);
             }
             else if (type == LogMessageType.Error)
-            { // if nobody is subscribled to us and there is a log error / если на нас никто не подписан и в логе ошибка
+            { // if nobody is subscribled to us and there is a log error
+              // если на нас никто не подписан и в логе ошибка
                 MessageBox.Show(message);
             }
         }
 
         /// <summary>
-        /// outgoing log message
-        /// исходящее сообщение для лога
+        /// outgoing log message event
         /// </summary>
         public static event Action<string, LogMessageType> LogMessageEvent;
+
+        #endregion
 
     }
 
@@ -1178,7 +1204,7 @@ namespace OsEngine.Market
         /// cryptocurrency exchange Gate.io
         /// биржа криптовалют Gate.io
         /// </summary>
-        GateIo,
+        GateIoSpot,
 
         /// <summary>
         /// Futures of cryptocurrency exchange Gate.io
@@ -1283,12 +1309,6 @@ namespace OsEngine.Market
         QuikDde,
 
         /// <summary>
-        /// SmartCom
-        /// Смарт-Ком
-        /// </summary>
-        SmartCom,
-
-        /// <summary>
         /// Plaza 2
         /// Плаза 2
         /// </summary>
@@ -1355,6 +1375,26 @@ namespace OsEngine.Market
         /// <summary>
         /// Ascendex exchange
         /// </summary>
-        Bitmax_AscendexFutures
+        Bitmax_AscendexFutures,
+
+        /// <summary>
+        /// BybitSpot exchange
+        /// </summary>
+        BybitSpot,
+
+        /// <summary>
+        /// BitGetSpot exchange
+        /// </summary>
+        BitGetSpot,
+
+        /// <summary>
+        /// BitGetFutures exchange
+        /// </summary>
+        BitGetFutures,
+        
+        /// <summary>
+        /// Alor OpenAPI & Websocket
+        /// </summary>
+        Alor
     }
 }

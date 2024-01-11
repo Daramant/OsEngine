@@ -46,18 +46,17 @@ namespace OsEngine.Market.Servers.Transaq
             CreateParameterBoolean(OsLocalization.Market.UseSecInfoUpdates, false);
             CreateParameterButton(OsLocalization.Market.ButtonNameChangePassword);
 
+            ServerParameters[4].Comment = OsLocalization.Market.Label107;
+            ServerParameters[5].Comment = OsLocalization.Market.Label107;
+            ServerParameters[6].Comment = OsLocalization.Market.Label107;
+            ServerParameters[7].Comment = OsLocalization.Market.Label107;
+            ServerParameters[8].Comment = OsLocalization.Market.Label107;
+            ServerParameters[9].Comment = OsLocalization.Market.Label108;
+            ServerParameters[10].Comment = OsLocalization.Market.Label105;
+
         }
 
         public ServerWorkingTimeSettings WorkingTimeSettings;
-
-        /// <summary>
-        /// override method that gives server state
-        /// переопределяем метод отдающий состояние сервера
-        /// </summary>
-        public override bool IsTimeToServerWork
-        {
-            get { return ((TransaqServerRealization)ServerRealization).ServerInWork; }
-        }
 
         /// <summary>
         /// request of history by instrument
@@ -209,7 +208,6 @@ namespace OsEngine.Market.Servers.Transaq
             _client.MyTradeEvent += ClientOnMyTradeEvent;
             _client.NewCandles += ClientOnNewCandles;
             _client.NeedChangePassword += NeedChangePassword;
-            _client.UpdateSecurity += ClientOnUpdateSecurityInfo;
             _client.NewTicks += _client_NewTicks;
 
             _client.Connect(useSecUpdates);
@@ -267,29 +265,35 @@ namespace OsEngine.Market.Servers.Transaq
 
         public void ChangePassword(string oldPassword, string newPassword, ChangeTransaqPassword window)
         {
-
-            if (_client == null)
+            try
             {
-                window.TextInfo.Text = "Отсутствует подключение к бирже.";
-                return;
+                if (_client == null)
+                {
+                    window.TextInfo.Text = OsLocalization.Market.Label102;
+                    return;
+                }
+
+                string cmd = $"<command id=\"change_pass\" oldpass=\"{oldPassword}\" newpass=\"{newPassword}\"/>";
+
+                // sending command / отправка команды
+                string res = _client.ConnectorSendCommand(cmd);
+
+                if (res == "<result success=\"true\"/>")
+                {
+                    ((ServerParameterPassword)ServerParameters[1]).Value = newPassword;
+                    window.TextInfo.Text = OsLocalization.Market.Label103;
+                }
+                else
+                {
+                    window.TextInfo.Text = res;
+                }
+
+                Dispose();
             }
-
-            string cmd = $"<command id=\"change_pass\" oldpass=\"{oldPassword}\" newpass=\"{newPassword}\"/>";
-
-            // sending command / отправка команды
-            string res = _client.ConnectorSendCommand(cmd);
-
-            if (res == "<result success=\"true\"/>")
+            catch (Exception ex)
             {
-                ((ServerParameterPassword)ServerParameters[1]).Value = newPassword;
-                window.TextInfo.Text = "Пароль успешно изменен.";
+                window.TextInfo.Text = ex.ToString();
             }
-            else
-            {
-                window.TextInfo.Text = res;
-            }
-
-            Dispose();
         }
 
         private readonly ServerWorkingTimeSettings _workingTimeSettings;
@@ -346,7 +350,6 @@ namespace OsEngine.Market.Servers.Transaq
                 _client.MyTradeEvent -= ClientOnMyTradeEvent;
                 _client.NewCandles -= ClientOnNewCandles;
                 _client.NeedChangePassword -= NeedChangePassword;
-                _client.UpdateSecurity -= ClientOnUpdateSecurityInfo;
             }
 
             _depths?.Clear();
@@ -357,13 +360,11 @@ namespace OsEngine.Market.Servers.Transaq
 
             _cancellationTokenSource?.Cancel();
 
-            _transaqSecurities = new ConcurrentBag<string>();
+            _transaqSecurities = new ConcurrentQueue<string>();
 
             _portfoliosHandlerTask = null;
 
             _securities = new List<Security>();
-
-            _securityInfos = new List<string>();
 
             _client = null;
 
@@ -546,6 +547,16 @@ namespace OsEngine.Market.Servers.Transaq
             order.TimeCallBack = ServerTime;
 
             MyOrderEvent?.Invoke(order);
+        }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
         }
 
         /// <summary>
@@ -873,6 +884,10 @@ namespace OsEngine.Market.Servers.Transaq
                     newCandle = new Candle();
                     newCandle.Open = oldCandles[i].Open;
                     newCandle.TimeStart = oldCandles[i].TimeStart;
+                    if (needTf <=60 && newCandle.TimeStart.Minute % needTf !=0)  //AVP, если свечка пришла в некратное ТФ время, например, был пропуск свечи, то ТФ правим на кратное. на MOEX  в пропущенные на клиринге свечках, на 10 минутках давало сбой - сдвиг свечек на 5 минут.
+                    {
+                        newCandle.TimeStart = newCandle.TimeStart.AddMinutes((newCandle.TimeStart.Minute % needTf) * -1);        
+                    }
                     newCandle.Low = Decimal.MaxValue;
                 }
 
@@ -886,7 +901,9 @@ namespace OsEngine.Market.Servers.Transaq
 
                 newCandle.Volume += oldCandles[i].Volume;
 
-                if (counter == count)
+               
+
+                if (counter == count || (needTf <= 60 && i < oldCandles.Count-2 && oldCandles[i+1].TimeStart.Minute % needTf == 0) )    // AVP добавил проверку "или", что следующая свечка в мелком ТФ, должна войти в следующую свечу более крупного ТФ
                 {
                     newCandle.Close = oldCandles[i].Close;
                     newCandle.State = CandleState.Finished;
@@ -899,6 +916,7 @@ namespace OsEngine.Market.Servers.Transaq
                     newCandle.Close = oldCandles[i].Close;
                     newCandle.State = CandleState.Started;
                     newCandles.Add(newCandle);
+                   
                 }
             }
 
@@ -979,7 +997,6 @@ namespace OsEngine.Market.Servers.Transaq
         void _client_Connected()
         {
             CreateSecurities();
-            UpdateSecuritiesParallel();
             ConnectEvent?.Invoke();
             ServerStatus = ServerConnectStatus.Connect;
         }
@@ -1189,6 +1206,8 @@ namespace OsEngine.Market.Servers.Transaq
         /// </summary>
         private List<Security> _securities;
 
+        private ConcurrentQueue<string> _transaqSecurities = new ConcurrentQueue<string>();
+
         /// <summary>
         /// got instruments
         /// пришли инструменты
@@ -1196,88 +1215,55 @@ namespace OsEngine.Market.Servers.Transaq
         /// <param name="securities">list of instrument in transaq format / список инструментов в формате transaq</param>
         private void ClientOnUpdatePairs(string securities)
         {
-            HandleSecurities(securities);
+            _transaqSecurities.Enqueue(securities);
+            _lastUpdateSecurityArrayTime = DateTime.Now;
         }
 
-        private List<string> _securityInfos = new List<string>();
-
-        /// <summary>
-        /// obtained additional data on the security
-        /// получены дополнительные данные по инструменту
-        /// </summary>
-        private void ClientOnUpdateSecurityInfo(List<string> securityInfo)
-        {
-            _securityInfos = securityInfo;
-        }
-
-        private void UpdateSecuritiesParallel()
-        {
-            ParallelLoopResult result = Parallel.ForEach<string>(_securityInfos, UpdateSecurity);
-
-            if (result.IsCompleted)
-            {
-                SecurityEvent?.Invoke(_securities);
-            }
-            else
-            {
-                SendLogMessage("Ошибка обновления инструмента!", LogMessageType.Error);
-            }
-        }
-
-        private void UpdateSecurity(string data)
-        {
-            var securityInfo = _client.Deserialize<SecurityInfo>(data);
-
-            var needSec = _securities.Find(s => s != null && s.Name == securityInfo.Seccode);
-            if (needSec != null)
-            {
-                if (needSec.SecurityType == SecurityType.Option && securityInfo.Bgo_nc != null)
-                {
-                    needSec.Go = securityInfo.Bgo_nc.ToDecimal();
-                }
-                else if (needSec.SecurityType == SecurityType.Futures && securityInfo.Sell_deposit != null)
-                {
-                    needSec.Go = securityInfo.Sell_deposit.ToDecimal();
-                    if (securityInfo.Maxprice != null && securityInfo.Minprice != null)
-                    {
-                        needSec.PriceLimitHigh = securityInfo.Maxprice.ToDecimal();
-                        needSec.PriceLimitLow = securityInfo.Minprice.ToDecimal();
-                    }
-                }
-            }
-        }
-
-        private ConcurrentBag<string> _transaqSecurities = new ConcurrentBag<string>();
-
-        /// <summary>
-        /// process the list of new securities
-        /// обработать список новых бумаг
-        /// </summary>
-        private void HandleSecurities(string securities)
-        {
-            _transaqSecurities.Add(securities);
-        }
+        private DateTime _lastUpdateSecurityArrayTime;
 
         private void CreateSecurities()
         {
-            ParallelLoopResult result = Parallel.ForEach<string>(_transaqSecurities, CreateSecuritiesParallel);
+            while(true)
+            {
+                Thread.Sleep(500);
+                if (_lastUpdateSecurityArrayTime ==  DateTime.MinValue)
+                {
+                    continue;
+                }
+                if(_lastUpdateSecurityArrayTime.AddSeconds(5) >  DateTime.Now)
+                {
+                    continue;
+                }
 
-            if (result.IsCompleted)
-            {
-                _securities.RemoveAll(s => s == null);
-                SecurityEvent?.Invoke(_securities);
+                break;
             }
-            else
+
+            DateTime timeStart = DateTime.Now;          
+
+            while(_transaqSecurities.IsEmpty == false)
             {
-                SendLogMessage("Ошибка создания инструмента!", LogMessageType.Error);
+                string curArray = null;
+                
+                if(_transaqSecurities.TryDequeue(out curArray))
+                {
+                    CreateSecurities(curArray);
+                }
             }
+
+            _securities.RemoveAll(s => s == null);
+            SecurityEvent?.Invoke(_securities);
+
+            TimeSpan timeOnWork =  DateTime.Now - timeStart;
+
+            SendLogMessage("Time securities add: " + timeOnWork.ToString(), LogMessageType.System);
+            SendLogMessage("Securities count: " + _securities.Count, LogMessageType.System);
         }
 
-        private void CreateSecuritiesParallel(string data)
+        private void CreateSecurities(string data)
         {
-            var transaqSecurities = _client.DeserializeSecurities(data);
+            List<TransaqEntity.Security> transaqSecurities = _client.DeserializeSecurities(data);
 
-            foreach (var securityData in transaqSecurities)
+            foreach (TransaqEntity.Security securityData in transaqSecurities)
             {
                 try
                 {
@@ -1696,6 +1682,16 @@ namespace OsEngine.Market.Servers.Transaq
         public void ResearchTradesToOrders(List<Order> orders)
         {
 
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
+using System.Windows.Forms.DataVisualization.Charting;
 using System.Windows.Forms.Integration;
 using System.Windows.Shapes;
 using OsEngine.Charts;
@@ -534,6 +535,7 @@ namespace OsEngine.OsMiner.Patterns
         public void ShowJournal()
         {
             Journal.Journal journal = new Journal.Journal("",StartProgram.IsOsMiner);
+
             for (int i = 0; i < PositionsInTrades.Count; i++)
             {
                 journal.SetNewDeal(PositionsInTrades[i]);
@@ -1629,7 +1631,7 @@ namespace OsEngine.OsMiner.Patterns
                 _volume = (Volume)_chart.CreateIndicator(_volume, "VolumeArea");
             }
             _volume.Process(series.Candles);
-            
+
         }
 
         /// <summary>
@@ -1780,7 +1782,6 @@ namespace OsEngine.OsMiner.Patterns
                 }
             }
         }
-
     }
 
     /// <summary>

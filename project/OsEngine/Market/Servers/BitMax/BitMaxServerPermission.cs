@@ -87,8 +87,17 @@ namespace OsEngine.Market.Servers.OKX
             get { return false; }
         }
 
+        public bool MarketOrdersIsSupport
+        {
+            get { return true; }
+        }
 
         public bool IsTradeServer
+        {
+            get { return false; }
+        }
+
+        public bool IsCanChangeOrderPrice
         {
             get { return false; }
         }
@@ -98,7 +107,7 @@ namespace OsEngine.Market.Servers.OKX
             get { return _tradeTimeFramePermission; }
         }
 
-        public int WaitTimeAfterFirstStartToSendOrders
+        public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
             get { return 1; }
         }
@@ -127,5 +136,31 @@ namespace OsEngine.Market.Servers.OKX
                 TimeFrameHour4IsOn = true,
                 TimeFrameDayIsOn = false
             };
+
+
+        public bool UseStandartCandlesStarter
+        {
+            get { return false; }
+        }
+
+        public bool IsUseLotToCalculateProfit
+        {
+            get { return false; }
+        }
+
+        public bool ManuallyClosePositionOnBoard_IsOn
+        {
+            get { return false; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
+        {
+            get { return null; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
+        {
+            get { return null; }
+        }
     }
 }

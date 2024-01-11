@@ -81,6 +81,11 @@ namespace OsEngine.Market.Servers.Plaza
             _plazaController.ExecuteOrder(order);
         }
 
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
         public void CancelOrder(Order order)
         {
             _plazaController.CancelOrder(order);
@@ -426,6 +431,16 @@ namespace OsEngine.Market.Servers.Plaza
         public void ResearchTradesToOrders(List<Order> orders)
         {
 
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

@@ -140,6 +140,11 @@ namespace OsEngine.Market.Servers.Tinkoff
             // Этот сервер берёт их автоматически, раз в N секунд
         }
 
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
         public List<Candle> GetCandleHistory(string nameSec, TimeFrame tf)
         {
             DateTime to = DateTime.Now;
@@ -225,6 +230,16 @@ namespace OsEngine.Market.Servers.Tinkoff
         public void SendOrder(Order order)
         {
             _client.ExecuteOrder(order);
+        }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
         }
 
         /// <summary>
@@ -494,6 +509,11 @@ namespace OsEngine.Market.Servers.Tinkoff
         public void ResearchTradesToOrders(List<Order> orders)
         {
 
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

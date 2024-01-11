@@ -269,6 +269,11 @@ namespace OsEngine.Market.Servers.BitMaxFutures
 
         }
 
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
         public void SendOrder(Order order)
         {
 
@@ -297,6 +302,16 @@ namespace OsEngine.Market.Servers.BitMaxFutures
 
 
             // торговля по фьчерсам временна приостановленна...
+        }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
         }
 
         public void GetOrdersState(List<Order> orders)
@@ -708,6 +723,11 @@ namespace OsEngine.Market.Servers.BitMaxFutures
                 SendNewLogMessage(error.Message, LogMessageType.Error);
             }
 
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion

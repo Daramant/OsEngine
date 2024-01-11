@@ -66,8 +66,6 @@ namespace OsEngine.PrimeSettings
 
         private static bool _transactionBeepIsActiv;
 
-
-
         public static bool RebootTradeUiLigth
         {
             get
@@ -86,26 +84,6 @@ namespace OsEngine.PrimeSettings
         }
 
         private static bool _rebootTradeUiLigth;
-
-
-        public static bool ServerTestingIsActive
-        {
-            get
-            {
-                if (_isLoad == false)
-                {
-                    Load();
-                }
-                return _serverTestingIsActiv;
-            }
-            set
-            {
-                _serverTestingIsActiv = value;
-                Save();
-            }
-        }
-
-        private static bool _serverTestingIsActiv;
 
         public static bool AutoStartApi
         {
@@ -215,7 +193,6 @@ namespace OsEngine.PrimeSettings
                     writer.WriteLine(_transactionBeepIsActiv);
                     writer.WriteLine(_errorLogBeepIsActiv);
                     writer.WriteLine(_errorLogMessageBoxIsActiv);
-                    writer.WriteLine(_serverTestingIsActiv);
                     writer.WriteLine(_autoStartApi);
                     writer.WriteLine(_token);
                     writer.WriteLine(_ip);
@@ -252,7 +229,6 @@ namespace OsEngine.PrimeSettings
                     _transactionBeepIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _errorLogBeepIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _errorLogMessageBoxIsActiv = Convert.ToBoolean(reader.ReadLine());
-                    _serverTestingIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _autoStartApi = Convert.ToBoolean(reader.ReadLine());
                     _token = reader.ReadLine();
                     _ip = reader.ReadLine();

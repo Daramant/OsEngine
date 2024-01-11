@@ -13,7 +13,6 @@ using System.Windows.Forms;
 using System.Threading;
 using OsEngine.Charts.CandleChart;
 
-
 namespace OsEngine.OsData
 {
     public class OsDataSetPainter
@@ -416,11 +415,57 @@ namespace OsEngine.OsData
                 }
             }
             else if (coluIndex == 10)
-            { // delete
+            { // delete or detail
 
                 if(_dataGrid.Rows[rowIndex].Cells[0].Value == null
                    || _dataGrid.Rows[rowIndex].Cells[0].Value.ToString() == "")
                 {
+                    // detail
+                    int numSecurity = -1;
+
+                    for (int i = rowIndex; i > -1; i--)
+                    {
+                        try
+                        {
+                            numSecurity = Convert.ToInt32(_dataGrid.Rows[i].Cells[0].Value.ToString());
+                            break;
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (numSecurity == -1)
+                    {
+                        return;
+                    }
+
+                    string TfInSecurity = _dataGrid.Rows[rowIndex].Cells[6].Value.ToString();
+
+                    SecurityToLoad sec = _set.SecuritiesLoad[numSecurity - 1];
+
+                    SecurityTfLoader loader = null;
+
+                    for (int i = 0; i < sec.SecLoaders.Count; i++)
+                    {
+                        if (sec.SecLoaders[i].TimeFrame.ToString() == TfInSecurity)
+                        {
+                            loader = sec.SecLoaders[i];
+                            break;
+                        }
+                    }
+
+                    if (loader == null)
+                    {
+                        return;
+                    }
+
+                    OsDataSetDetailUi detailUi = new OsDataSetDetailUi(loader);
+                    detailUi.ShowDialog();
+                    loader.CheckTimeInSets();
+                    RePaintInterface();
+
                     return;
                 }
 
@@ -487,9 +532,9 @@ namespace OsEngine.OsData
             }
 
             _labelSetName.Content = _set.SetName;
-            _labelTimeStart.Content = _set.BaseSettings.TimeStart.ToShortDateString();
-            _labelTimeEnd.Content = _set.BaseSettings.TimeEnd.ToShortDateString();
 
+            _labelTimeStart.Content = _set.BaseSettings.TimeStart.ToString(OsLocalization.ShortDateFormatString);
+            _labelTimeEnd.Content = _set.BaseSettings.TimeEnd.ToString(OsLocalization.ShortDateFormatString);
         }
 
         private void RePaintGrid()
@@ -506,6 +551,9 @@ namespace OsEngine.OsData
                 return;
             }
 
+            int lastShowRow = _dataGrid.FirstDisplayedScrollingRowIndex;
+
+
             _dataGrid.Rows.Clear();
 
             List<SecurityToLoad> secs = _set.SecuritiesLoad;
@@ -518,6 +566,12 @@ namespace OsEngine.OsData
                 {
                     _dataGrid.Rows.Add(secRows[i2]);
                 }
+            }
+
+            if(lastShowRow != -1  &&
+                lastShowRow < _dataGrid.Rows.Count)
+            {
+                _dataGrid.FirstDisplayedScrollingRowIndex = lastShowRow;
             }
         }
 
@@ -707,10 +761,10 @@ colum11.HeaderText = "Delete";
             row.Cells[3].Value = "";
 
             row.Cells.Add(new DataGridViewTextBoxCell()); // Start
-            row.Cells[4].Value = loader.TimeStartInReal.Date.ToString("dd.MM.yyyy");
+            row.Cells[4].Value = loader.TimeStartInReal.Date.ToString(OsLocalization.ShortDateFormatString);
 
             row.Cells.Add(new DataGridViewTextBoxCell()); // End
-            row.Cells[5].Value = loader.TimeEndInReal.Date.ToString("dd.MM.yyyy");
+            row.Cells[5].Value = loader.TimeEndInReal.Date.ToString(OsLocalization.ShortDateFormatString);
 
             row.Cells.Add(new DataGridViewTextBoxCell()); // TF
             row.Cells[6].Value = loader.TimeFrame.ToString();
@@ -730,7 +784,12 @@ colum11.HeaderText = "Delete";
             }
            
             row.Cells.Add(new DataGridViewButtonCell()); //"Delete";
-            row.Cells[10].Value = "";
+
+            if(loader.TimeFrame != TimeFrame.MarketDepth)
+            {
+                row.Cells[10].Value = OsLocalization.Data.Label47;
+            }
+            
 
             return row;
         }

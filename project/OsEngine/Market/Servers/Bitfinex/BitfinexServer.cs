@@ -322,6 +322,16 @@ namespace OsEngine.Market.Servers.Bitfinex
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel order
         /// отозвать ордер
         /// </summary>
@@ -1174,6 +1184,16 @@ namespace OsEngine.Market.Servers.Bitfinex
         public void ResearchTradesToOrders(List<Order> orders)
         {
 
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         public event Action<string, LogMessageType> LogMessageEvent;

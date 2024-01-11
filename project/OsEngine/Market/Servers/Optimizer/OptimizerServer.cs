@@ -172,6 +172,8 @@ namespace OsEngine.Market.Servers.Optimizer
                 TimeNow = TimeNow.AddMilliseconds(-1);
             }
 
+
+
             if (TypeTesterData == TesterDataType.TickAllCandleState ||
     TypeTesterData == TesterDataType.TickOnlyReadyCandle)
             {
@@ -475,7 +477,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         private void LoadNextData()
         {
-            if (TimeNow > _storages[0].TimeEnd)
+            if (TimeNow > _storages[0].TimeEnd.AddDays(1))
             {
                 _testerRegime = TesterRegime.Pause;
 
@@ -522,7 +524,7 @@ namespace OsEngine.Market.Servers.Optimizer
 
             for (int i = 0; _candleSeriesTesterActivate != null && i < _candleSeriesTesterActivate.Count; i++)
             {
-                if(_candleSeriesTesterActivate[i].TimeEnd < TimeNow)
+                if(TimeNow > _candleSeriesTesterActivate[i].TimeEnd.AddDays(1))
                 {
                     continue;
                 }
@@ -1829,6 +1831,16 @@ namespace OsEngine.Market.Servers.Optimizer
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
 		/// cancel order from the exchange
         /// отозвать ордер с биржи
         /// </summary>
@@ -2004,8 +2016,13 @@ namespace OsEngine.Market.Servers.Optimizer
             }
         }
 
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
-		/// log manager
+        /// log manager
         /// лог менеджер
         /// </summary>
         /// 
@@ -2193,7 +2210,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         private void CheckTrades(DateTime now)
         {
-            if (now > TimeEnd ||
+            if (now > TimeEnd.AddDays(1) ||
                 now < TimeStart)
             {
                 return;
@@ -2278,7 +2295,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// </summary>
         private void CheckCandles(DateTime now)
         {
-            if (now > TimeEnd ||
+            if (now > TimeEnd.AddDays(1) ||
                 now < TimeStart)
             {
                 return;
@@ -2334,6 +2351,11 @@ namespace OsEngine.Market.Servers.Optimizer
             while (LastCandle == null ||
                 LastCandle.TimeStart < now)
             {
+                if(_lastCandleIndex >= Candles.Count)
+                {
+                    _lastCandleIndex = Candles.Count - 1;
+                }
+
                 LastCandle = Candles[_lastCandleIndex];
                 LastCandle.State = CandleState.Finished;
                 _lastCandleIndex++;
@@ -2405,7 +2427,7 @@ namespace OsEngine.Market.Servers.Optimizer
         /// <param name="now">время</param>
         private void CheckMarketDepth(DateTime now)
         {
-            if (now > TimeEnd ||
+            if (now > TimeEnd.AddDays(1) ||
                 now < TimeStart)
             {
                 return;

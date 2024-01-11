@@ -23,35 +23,33 @@ namespace CustomIndicators.Scripts
         private Aindicator _smaLips;
         private Aindicator _smaJaw;
 
-
         public override void OnStateChange(IndicatorState state)
         {
             if (state == IndicatorState.Configure)
             {
                 _lengthJaw = CreateParameterInt("Jaw length", 13);
-                _lengthLips = CreateParameterInt("Lips length", 8);
-                _lengthTeeth = CreateParameterInt("Teeth length", 5);
+                _lengthTeeth = CreateParameterInt("Teeth length", 8);
+                _lengthLips = CreateParameterInt("Lips length", 5);
 
                 _shiftJaw = CreateParameterInt("Jaw offset", 8);
-                _shiftLips = CreateParameterInt("Lips offset", 3);
                 _shiftTeeth = CreateParameterInt("Teeth offset", 5);
+                _shiftLips = CreateParameterInt("Lips offset", 3);
 
                 _seriesJaw = CreateSeries("Jaw", Color.DodgerBlue, IndicatorChartPaintType.Line, true);
                 _seriesTeeth = CreateSeries("Teeth", Color.DarkRed, IndicatorChartPaintType.Line, true);
                 _seriesLips = CreateSeries("Lips", Color.LawnGreen, IndicatorChartPaintType.Line, true);
 
                 _smaJaw = IndicatorsFactory.CreateIndicatorByName("Ssma", Name + "SsmaJaw", false);
-                ((IndicatorParameterInt)_smaJaw.Parameters[0]).Bind(_lengthJaw);
+                _smaJaw.Parameters[0].Bind(_lengthJaw);
                 ProcessIndicator("Jaw SSMA", _smaJaw);
 
                 _smaLips = IndicatorsFactory.CreateIndicatorByName("Ssma", Name + "SsmaLips", false);
-                ((IndicatorParameterInt)_smaLips.Parameters[0]).Bind(_lengthLips);
+                _smaLips.Parameters[0].Bind(_lengthLips);
                 ProcessIndicator("Lips SSMA", _smaLips);
 
                 _smaTeeth = IndicatorsFactory.CreateIndicatorByName("Ssma", Name + "SsmaTeeth", false);
-                ((IndicatorParameterInt)_smaTeeth.Parameters[0]).Bind(_lengthTeeth);
+                _smaTeeth.Parameters[0].Bind(_lengthTeeth);
                 ProcessIndicator("Teeth SSMA", _smaTeeth);
-
             }
         }
 

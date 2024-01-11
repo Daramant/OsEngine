@@ -55,6 +55,11 @@ namespace OsEngine
             InitializeComponent();
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
+            ImageAlor2.Visibility = Visibility.Collapsed;
+            ImageAlor.Visibility = Visibility.Collapsed;
+
+            this.Closed += MainWindow_Closed;
+
             try
             {
                 int winVersion = Environment.OSVersion.Version.Major;
@@ -71,6 +76,12 @@ namespace OsEngine
                 if (!CheckWorkWithDirectory())
                 {
                     MessageBox.Show(OsLocalization.MainWindow.Message2);
+                    Close();
+                }
+
+                if(!CheckOutSomeLibrariesNearby())
+                {
+                    MessageBox.Show(OsLocalization.MainWindow.Message6);
                     Close();
                 }
             }
@@ -102,13 +113,39 @@ namespace OsEngine
 
             GlobalGUILayout.Listen(this, "mainWindow");
 
-            this.Closed += MainWindow_Closed;
+            ImageAlor.MouseEnter += ImageAlor_MouseEnter;
+            ImageAlor2.MouseLeave += ImageAlor_MouseLeave;
+            ImageAlor2.MouseDown += ImageAlor2_MouseDown;
+        }
+
+        private void ImageAlor2_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo("https://www.alorbroker.ru/open?pr=L0745") { UseShellExecute = true });
+        }
+
+        private void ImageAlor_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                ImageAlor2.Visibility = Visibility.Collapsed;
+                ImageAlor.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ImageAlor_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                ImageAlor2.Visibility = Visibility.Visible;
+                ImageAlor.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             ProccesIsWorked = false;
             GlobalGUILayout.IsClosed = true;
+            Process.GetCurrentProcess().Kill();
         }
 
         private void ChangeText()
@@ -128,6 +165,18 @@ namespace OsEngine
 
             ButtonTesterLight.Content = OsLocalization.MainWindow.OsTesterLightName;
             ButtonRobotLight.Content = OsLocalization.MainWindow.OsBotStationLightName;
+
+            if(OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                this.Height = 415;
+                ImageAlor.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                this.Height = 315;
+                ImageAlor.Visibility = Visibility.Collapsed;
+                ImageAlor2.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
@@ -169,6 +218,18 @@ namespace OsEngine
 
                 return false;
             }
+        }
+
+        private bool CheckOutSomeLibrariesNearby()
+        {
+            // проверяем чтобы пользователь не запустился с рабочего стола, но не ярлыком, а экзешником
+
+            if(File.Exists("QuikSharp.dll") == false)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>

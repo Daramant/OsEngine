@@ -90,9 +90,19 @@ namespace OsEngine.Market.Servers.Huobi.FuturesSwap
 
         #endregion
 
+        public bool MarketOrdersIsSupport
+        {
+            get { return true; }
+        }
+
         public bool IsTradeServer
         {
             get { return true; }
+        }
+
+        public bool IsCanChangeOrderPrice
+        {
+            get { return false; }
         }
 
         public TimeFramePermission TradeTimeFramePermission
@@ -100,7 +110,7 @@ namespace OsEngine.Market.Servers.Huobi.FuturesSwap
             get { return _tradeTimeFramePermission; }
         }
 
-        public int WaitTimeAfterFirstStartToSendOrders
+        public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
             get { return 1; }
         }
@@ -129,5 +139,31 @@ namespace OsEngine.Market.Servers.Huobi.FuturesSwap
                 TimeFrameHour4IsOn = true,
                 TimeFrameDayIsOn = true
             };
+
+
+        public bool UseStandartCandlesStarter
+        {
+            get { return false; }
+        }
+
+        public bool IsUseLotToCalculateProfit
+        {
+            get { return false; }
+        }
+
+        public bool ManuallyClosePositionOnBoard_IsOn
+        {
+            get { return false; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
+        {
+            get { return null; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
+        {
+            get { return null; }
+        }
     }
 }

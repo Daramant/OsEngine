@@ -11,13 +11,11 @@ using OsEngine.Market.Servers;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using ContextMenu = System.Windows.Forms.ContextMenu;
-using DataGrid = System.Windows.Forms.DataGrid;
 using MenuItem = System.Windows.Forms.MenuItem;
 using MessageBox = System.Windows.Forms.MessageBox;
 using Point = System.Drawing.Point;
@@ -136,9 +134,15 @@ namespace OsEngine.OsData
 
         public void StartPaintActiveSet()
         {
-            if (_master.SelectSet == null)
+            if (_master.Sets == null||
+                _master.Sets.Count == 0)
             {
                 return;
+            }
+
+            if(_master.SelectSet == null)
+            {
+                _master.SelectSet = _master.Sets[0];
             }
 
             OsDataSetPainter curPainter = null;

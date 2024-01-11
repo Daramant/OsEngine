@@ -7,10 +7,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Media;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
@@ -26,6 +25,7 @@ using OsEngine.OsMiner;
 using OsEngine.OsOptimizer;
 using OsEngine.OsTrader;
 using OsEngine.OsTrader.Panels;
+using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.PrimeSettings;
 
 namespace OsEngine.Logging
@@ -101,7 +101,7 @@ namespace OsEngine.Logging
                 }
                 catch (Exception error)
                 {
-                    MessageBox.Show(error.ToString());
+                    System.Windows.MessageBox.Show(error.ToString());
                 }
             }
         }
@@ -121,6 +121,7 @@ namespace OsEngine.Logging
         {
             _uniqName = uniqName;
             _startProgram = startProgram;
+            _currentCulture = OsLocalization.CurCulture;
 
             lock (_starterLocker)
             {
@@ -140,6 +141,7 @@ namespace OsEngine.Logging
             if (_startProgram == StartProgram.IsOsTrader)
             {
                 _messageSender = new MessageSender(uniqName, _startProgram);
+                TryLoadLog();
             }
         }
 
@@ -352,7 +354,7 @@ namespace OsEngine.Logging
             }
             catch (Exception error)
             {
-                MessageBox.Show(error.ToString());
+                System.Windows.MessageBox.Show(error.ToString());
             }
         }
 
@@ -370,6 +372,8 @@ namespace OsEngine.Logging
 
         private StartProgram _startProgram;
 
+        private CultureInfo _currentCulture;
+
         List<CandleConverter> _candleConverters = new List<CandleConverter>();
         List<OsConverterMaster> _osConverterMasters = new List<OsConverterMaster>();
         List<OsTraderMaster> _osTraderMasters = new List<OsTraderMaster>();
@@ -380,6 +384,7 @@ namespace OsEngine.Logging
         List<OptimizerMaster> _optimizers = new List<OptimizerMaster>();
         List<OsMinerServer> _miners = new List<OsMinerServer>();
         List<IServer> _serversToListen = new List<IServer>();
+        List<PolygonToTrade> _polygonsToTrade = new List<PolygonToTrade>();
 
         /// <summary>
         /// start listening to the server
@@ -479,6 +484,12 @@ namespace OsEngine.Logging
         {
             master.LogMessageEvent += ProcessMessage;
             _candleConverters.Add(master);
+        }
+
+        public void Listen(PolygonToTrade master)
+        {
+            master.LogMessageEvent += ProcessMessage;
+            _polygonsToTrade.Add(master);
         }
 
         bool _listenServerMasterAlreadyOn;
@@ -592,14 +603,16 @@ namespace OsEngine.Logging
                     return;
                 }
 
-                _messagesesToSaveInFile.Enqueue(messageLog);
-
+                if (messageLog.Type != LogMessageType.OldSession)
+                {
+                    _messagesesToSaveInFile.Enqueue(messageLog);
+                }
 
                 if (_grid != null)
                 {
                     DataGridViewRow row = new DataGridViewRow();
                     row.Cells.Add(new DataGridViewTextBoxCell());
-                    row.Cells[0].Value = messageLog.Time;
+                    row.Cells[0].Value = messageLog.Time.ToString(_currentCulture);
 
                     row.Cells.Add(new DataGridViewTextBoxCell());
                     row.Cells[1].Value = messageLog.Type;
@@ -615,7 +628,7 @@ namespace OsEngine.Logging
             }
             catch (Exception error)
             {
-                MessageBox.Show(error.ToString());
+                System.Windows.MessageBox.Show(error.ToString());
             }
         }
 
@@ -662,17 +675,93 @@ namespace OsEngine.Logging
 
                         if (_messagesesToSaveInFile.TryDequeue(out message))
                         {
-                            writer.WriteLine($"[{message.Time.ToLocalTime():yyyy-MM-dd HH:mm:ss}] {message.Message}");
+                            string mess = message.Time.ToLocalTime() + ";";
+                            mess += message.Type + ";";
+                            mess += message.Message + ";";
+
+                            writer.WriteLine(mess);
                         }
                     }
                 }
-
             }
             catch (Exception error)
             {
-                MessageBox.Show(error.ToString());
+                System.Windows.MessageBox.Show(error.ToString());
+            }
+        }
+
+        private void TryLoadLog()
+        {
+            if (!Directory.Exists(@"Engine\Log\"))
+            {
+                return;
             }
 
+            try
+            {
+                string date = DateTime.Now.Year + "_" + DateTime.Now.Month + "_" + DateTime.Now.Day;
+                string path = @"Engine\Log\" + _uniqName + @"Log_" + date + ".txt";
+
+                if (!File.Exists(path))
+                {
+                    return;
+                }
+
+                using (StreamReader reader = new StreamReader(
+                        path))
+                {
+
+                    List<string> messages = new List<string>();
+
+                    while (reader.EndOfStream == false)
+                    {
+                        messages.Add(reader.ReadLine());
+                    }
+
+                    if (messages.Count == 0)
+                    {
+                        return;
+                    }
+
+                    int startInd = messages.Count - 10;
+
+                    if (startInd < 0)
+                    {
+                        startInd = 0;
+                    }
+
+                    for (int i = startInd; i < messages.Count; i++)
+                    {
+                        string msg = messages[i];
+
+                        string[] msgArray = msg.Split(';');
+
+                        if (msgArray.Length != 4)
+                        {
+                            continue;
+                        }
+
+                        LogMessage message = new LogMessage();
+
+                        try
+                        {
+                            message.Time = Convert.ToDateTime(msgArray[0]);
+                            message.Type = LogMessageType.OldSession;
+                            message.Message = msgArray[1] + " " + msgArray[2];
+
+                            _incomingMessages.Enqueue(message);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+                }
+            }
+            catch (Exception error)
+            {
+                System.Windows.MessageBox.Show(error.ToString());
+            }
         }
 
         // distribution
@@ -763,6 +852,8 @@ namespace OsEngine.Logging
             _gridErrorLog = DataGridFactory.GetDataGridView(DataGridViewSelectionMode.FullRowSelect,
                 DataGridViewAutoSizeRowsMode.AllCells);
 
+            _gridErrorLog.ScrollBars = ScrollBars.Vertical;
+
             DataGridViewCellStyle style = new DataGridViewCellStyle();
             style.Alignment = DataGridViewContentAlignment.TopLeft;
             style.WrapMode = DataGridViewTriState.True;
@@ -811,7 +902,7 @@ namespace OsEngine.Logging
             {
                 DataGridViewRow row1 = new DataGridViewRow();
                 row1.Cells.Add(new DataGridViewTextBoxCell());
-                row1.Cells[0].Value = DateTime.Now;
+                row1.Cells[0].Value = DateTime.Now.ToString(OsLocalization.CurCulture);
 
                 row1.Cells.Add(new DataGridViewTextBoxCell());
                 row1.Cells[1].Value = LogMessageType.Error;
@@ -829,7 +920,7 @@ namespace OsEngine.Logging
 
             DataGridViewRow row = new DataGridViewRow();
             row.Cells.Add(new DataGridViewTextBoxCell());
-            row.Cells[0].Value = DateTime.Now;
+            row.Cells[0].Value = DateTime.Now.ToString(OsLocalization.CurCulture);
 
             row.Cells.Add(new DataGridViewTextBoxCell());
             row.Cells[1].Value = LogMessageType.Error;
@@ -943,6 +1034,11 @@ namespace OsEngine.Logging
         /// user action recorded
         /// Зафиксировано действие пользователя
         /// </summary>
-        User
+        User,
+
+        /// <summary>
+        /// Запись в логе с прошлой сессии
+        /// </summary>
+        OldSession,
     }
 }
