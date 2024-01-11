@@ -63,6 +63,10 @@ namespace OsEngine.Market.Servers
 
             for (int i = 0; i < _series.Count; i++)
             {
+                if(_series[i] == null)
+                {
+                    continue;
+                }
                 if (_series[i].Specification == spec)
                 {
                     _series.RemoveAt(i);
@@ -72,6 +76,10 @@ namespace OsEngine.Market.Servers
 
             for (int i = 0; i < _series.Count; i++)
             {
+                if (_series[i] == null)
+                {
+                    continue;
+                }
                 if (_series[i].UID == series.UID)
                 {
                     _series.RemoveAt(i);
@@ -86,6 +94,10 @@ namespace OsEngine.Market.Servers
         {
             for (int i = 0; i < _series.Count; i++)
             {
+                if (_series[i] == null)
+                {
+                    continue;
+                }
                 if (_series[i].UID == series.UID)
                 {
                     _series.RemoveAt(i);
@@ -94,8 +106,7 @@ namespace OsEngine.Market.Servers
             }
         }
 
-        // for saving in one file
-        // для сохранения в один файл
+        // saving in file
 
         /// <summary>
         /// method with tick saving thread
@@ -126,6 +137,10 @@ namespace OsEngine.Market.Servers
 
                     for (int i = 0; i < _series.Count; i++)
                     {
+                        if (_series[i] == null)
+                        {
+                            continue;
+                        }
                         if (MainWindow.ProccesIsWorked == false)
                         {
                             return;

@@ -6,6 +6,7 @@
 using System;
 using System.Windows;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
 using MessageBox = System.Windows.MessageBox;
 using TextBox = System.Windows.Forms.TextBox;
@@ -38,6 +39,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public MovingAverageUi(MovingAverage mA)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _mA = mA;
 
             TextBoxLenght.Text = _mA.Lenght.ToString();
@@ -53,6 +56,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
             ComboBoxMovingType.Items.Add(MovingAverageTypeCalculation.Radchenko);
             ComboBoxMovingType.Items.Add(MovingAverageTypeCalculation.Adaptive);
             ComboBoxMovingType.Items.Add(MovingAverageTypeCalculation.VolumeWeighted);
+            ComboBoxMovingType.Items.Add(MovingAverageTypeCalculation.Hull);
 
             ComboBoxMovingType.SelectionChanged += ComboBoxMovingType_SelectionChanged;
 
@@ -142,7 +146,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColor_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColor.Child.BackColor;
             dialog.ShowDialog();
 

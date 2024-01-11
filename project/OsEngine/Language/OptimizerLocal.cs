@@ -378,5 +378,41 @@ namespace OsEngine.Language
         public string Label50 => OsLocalization.ConvertToLocString(
           "Eng:In one of the optimization stages, less than one day. It is not possible to form an optimization sequence! Change the settings!_" +
           "Ru:В одном из этапов оптимизации менее одного дня. Сформировать последовательность оптимизации не получается! Измените настройки! _");
+
+        public string Label51 => OsLocalization.ConvertToLocString(
+          "Eng:Are you sure you want to interrupt the optimizer?_" +
+          "Ru:Вы уверены в том что хотите прервать работу оптимизатора?_");
+
+        public string Label52 => OsLocalization.ConvertToLocString(
+             "Eng:The robot is being tested_" +
+             "Ru:Робот тестируется_");
+
+        public string Label53 => OsLocalization.ConvertToLocString(
+             "Eng:Robustness metric: _" +
+             "Ru:Показатель робастности: _");
+
+        public string Label54 => OsLocalization.ConvertToLocString(
+            "Eng:Total profit _" +
+            "Ru:Итоговый профит _");
+
+        public string Label55 => OsLocalization.ConvertToLocString(
+           "Eng:Profit factor _" +
+           "Ru:Профит фактор _");
+
+        public string Label56 => OsLocalization.ConvertToLocString(
+           "Eng:P/L % 1 contract _" +
+           "Ru:П/У % 1 контракт _");
+
+        public string Label57 => OsLocalization.ConvertToLocString(
+           "Eng:Set Standart Params_" +
+           "Ru:Вернуть стандартные параметры_");
+
+        public string Label58 => OsLocalization.ConvertToLocString(
+           "Eng:Number_" +
+           "Ru:Номер_");
+
+        public string Label59 => OsLocalization.ConvertToLocString(
+           "Eng:Security_" +
+           "Ru:Бумага_");
     }
 }

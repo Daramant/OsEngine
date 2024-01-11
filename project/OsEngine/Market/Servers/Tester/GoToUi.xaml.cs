@@ -5,6 +5,7 @@
 
 using System;
 using System.Windows;
+using System.Windows.Markup;
 using OsEngine.Language;
 
 namespace OsEngine.Market.Servers.Tester
@@ -25,8 +26,10 @@ namespace OsEngine.Market.Servers.Tester
         public GoToUi(DateTime timeStart, DateTime timeEnd, DateTime timeNow)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
 
-            if((timeEnd - timeStart).TotalDays <= 0)
+            if ((timeEnd - timeStart).TotalDays <= 0)
             {
                 Close();
                 return;
@@ -41,6 +44,8 @@ namespace OsEngine.Market.Servers.Tester
             {
                 CalendarSelectData.SelectedDate = timeNow;
             }
+
+            CalendarSelectData.Language = XmlLanguage.GetLanguage(OsLocalization.CurLocalizationCode);
 
             ButtonAccept.Content = OsLocalization.Charts.LabelButtonIndicatorAccept;
             Title = OsLocalization.Charts.Label8;

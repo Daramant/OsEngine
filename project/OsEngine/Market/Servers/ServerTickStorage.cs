@@ -167,7 +167,7 @@ namespace OsEngine.Market.Servers
                             _tradeSaveInfo.Add(tradeInfo);
                         }
 
-                        if (tradeInfo.LastSaveIndex == allTrades[i1].Count)
+                        if (tradeInfo.LastSaveIndex >= allTrades[i1].Count)
                         {
                             continue;
                         }
@@ -360,5 +360,31 @@ namespace OsEngine.Market.Servers
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
 
+    }
+
+    /// <summary>
+    /// information to save trades/информация для сохранения тиков
+    /// </summary>
+    public class TradeSaveInfo
+    {
+        /// <summary>
+        /// Security name/имя бумаги
+        /// </summary>
+        public string NameSecurity;
+
+        /// <summary>
+        /// last save time/последнее время сохранения
+        /// </summary>
+        public DateTime LastSaveObjectTime;
+
+        /// <summary>
+        /// the last trade Id we saved/последний Id трейда который мы сохранили
+        /// </summary>
+        public string LastTradeId;
+
+        /// <summary>
+        /// last stored index/последнее сохранённый индекс
+        /// </summary>
+        public int LastSaveIndex;
     }
 }

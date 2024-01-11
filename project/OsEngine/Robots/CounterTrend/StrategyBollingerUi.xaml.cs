@@ -18,6 +18,8 @@ namespace OsEngine.Robots.CounterTrend
         public StrategyBollingerUi(StrategyBollinger strategy)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _strategy = strategy;
 
             TextBoxVolumeOne.Text = _strategy.Volume.ToString();

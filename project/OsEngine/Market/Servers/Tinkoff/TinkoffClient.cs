@@ -179,7 +179,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             securities.AddRange(stocks);
 
             List<Security> futures = GetSecurities(_url + "InstrumentsService/Futures", SecurityType.Futures);
-            securities.AddRange(stocks);
+            securities.AddRange(futures);
 
             List<Security> etfs = GetSecurities(_url + "InstrumentsService/Etfs", SecurityType.Stock);
             securities.AddRange(etfs);
@@ -267,6 +267,12 @@ namespace OsEngine.Market.Servers.Tinkoff
                 newSecurity.SecurityType = type;
                 newSecurity.Lot = jtSecurity.lot.ToDecimal();
 
+                if(newSecurity.SecurityType == SecurityType.Futures
+                    && jtSecurity.minPriceIncrementAmount != null)
+                {
+                    newSecurity.PriceStepCost = jtSecurity.minPriceIncrementAmount.GetValue();
+                }
+
                 securities.Add(newSecurity);
             }
 
@@ -276,6 +282,19 @@ namespace OsEngine.Market.Servers.Tinkoff
         public List<Candle> GetCandleHistory(string nameId, TimeFrame tf, DateTime from, DateTime to)
         {
             List<Candle> candles = new List<Candle>();
+
+            int days = 1; // период, за который запрашивать свечи 
+
+            if (tf == TimeFrame.Hour1 ||
+                tf == TimeFrame.Hour2 ||
+                tf == TimeFrame.Hour4)
+            {
+                days = 7; // Tinkoff api позволяет запрашивать большие интервалы данных для таймфреймов более 1 часа
+            }
+            else if (tf == TimeFrame.Day)
+            {
+                days = 35;
+            }
 
             while (from.Hour > 1)
             {
@@ -294,15 +313,15 @@ namespace OsEngine.Market.Servers.Tinkoff
 
             while (from <= to)
             {
-                candles.AddRange(GetCandleHistoryFromDay(from, nameId, tf));
+                candles.AddRange(GetCandleHistoryFromDays(from, nameId, tf, days));
 
-                from = from.AddDays(1);
+                from = from.AddDays(days);
             }
 
             return candles;
         }
 
-        private List<Candle> GetCandleHistoryFromDay(DateTime time, string nameSec, TimeFrame tf)
+        private List<Candle> GetCandleHistoryFromDays(DateTime time, string nameSec, TimeFrame tf, int days = 1)
         {
             /* {
                  "figi": "string",
@@ -319,7 +338,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             string dateFrom = ToIso8601(time);
             param.Add("from", dateFrom);
 
-            string dateTo = ToIso8601(time.AddDays(1));
+            string dateTo = ToIso8601(time.AddDays(days));
             param.Add("to", dateTo);
 
             string tfStr = CreateTimeFrameString(tf);
@@ -1070,36 +1089,55 @@ namespace OsEngine.Market.Servers.Tinkoff
 
                 for (int i = 0; i < _accountsResponse.accounts.Count; i++)
                 {
-                    Account account = _accountsResponse.accounts[i];
-
-                    if (string.IsNullOrEmpty(account.id))
+                    try
                     {
-                        continue;
+                        Account account = _accountsResponse.accounts[i];
+
+                        if (string.IsNullOrEmpty(account.id))
+                        {
+                            continue;
+                        }
+
+                        if (_accountsResponse.accounts[i].accessLevel.Equals("ACCOUNT_ACCESS_LEVEL_FULL_ACCESS") == false)
+                        {
+                            continue;
+                        }
+
+                        if (_accountsResponse.accounts[i].type.Equals("ACCOUNT_TYPE_INVEST_BOX") == true)
+                        {
+                            continue;
+                        }
+
+
+                        if (_accountsResponse.accounts[i].name.Equals("ИИС"))
+                        {
+                            continue;
+                        }
+
+                        string portUrl = _url + "OperationsService/GetPortfolio";
+
+                        Dictionary<string, string> param = new Dictionary<string, string>();
+
+                        param.Add("accountId", account.id);
+
+                        var resPort = CreatePrivatePostQuery(portUrl, param);
+
+                        if (resPort == null)
+                        {
+                            continue;
+                        }
+
+                        PortfoliosResponse portfoliosResponse = JsonConvert.DeserializeAnonymousType(resPort, new PortfoliosResponse());
+
+                        List<PositionOnBoard> byPower = GetPortfolioByPower(portfoliosResponse, account.id);
+
+                        UpdatePositionsInPortfolio(portfoliosResponse, portfoliosResponse.positions, account.id, byPower);
+                    }
+                    catch (Exception)
+                    {
+                        // ignore
                     }
 
-                    if (_accountsResponse.accounts[i].accessLevel.Equals("ACCOUNT_ACCESS_LEVEL_FULL_ACCESS") == false)
-                    {
-                        continue;
-                    }
-
-                    string portUrl = _url + "OperationsService/GetPortfolio";
-
-                    Dictionary<string, string> param = new Dictionary<string, string>();
-
-                    param.Add("accountId", account.id);
-
-                    var resPort = CreatePrivatePostQuery(portUrl, param);
-
-                    if (resPort == null)
-                    {
-                        continue;
-                    }
-
-                    PortfoliosResponse portfoliosResponse = JsonConvert.DeserializeAnonymousType(resPort, new PortfoliosResponse());
-
-                    List<PositionOnBoard> byPower = GetPortfolioByPower(portfoliosResponse, account.id);
-
-                    UpdatePositionsInPortfolio(portfoliosResponse, portfoliosResponse.positions, account.id, byPower);
                 }
 
                 if (UpdatePortfolio != null)
@@ -1528,7 +1566,19 @@ namespace OsEngine.Market.Servers.Tinkoff
                             continue;
                         }
 
-                        Order curOrder = GetOldOrderState(orderFromArray.PortfolioNumber, orderFromArray.NumberMarket, _openedOrders[i]);
+                        Security mySecurity = null;
+
+                        for(int i2 = 0;i2 < _allSecurities.Count;i2++)
+                        {
+                            if (_allSecurities[i2].Name == orderFromArray.SecurityNameCode 
+                                && _allSecurities[i2].NameClass == orderFromArray.SecurityClassCode)
+                            {
+                                mySecurity = _allSecurities[i2];
+                                break;
+                            }
+                        }
+
+                        Order curOrder = GetOldOrderState(orderFromArray.PortfolioNumber, orderFromArray.NumberMarket, _openedOrders[i], mySecurity);
 
                         if (curOrder == null)
                         {
@@ -1551,7 +1601,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             }
         }
 
-        private Order GetOldOrderState(string portfolioId, string orderId, Order oldOrder)
+        private Order GetOldOrderState(string portfolioId, string orderId, Order oldOrder, Security mySecurity)
         {
             if (IsConnected == false)
             {
@@ -1570,7 +1620,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             if (orderResp.stages != null &&
                 orderResp.stages.Count != 0)
             {
-                List<MyTrade> myTrades = GenerateMyTrades(orderResp, oldOrder);
+                List<MyTrade> myTrades = GenerateMyTrades(orderResp, oldOrder, mySecurity);
 
                 if (MyTradeEvent != null)
                 {
@@ -1645,7 +1695,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             return order;
         }
 
-        private List<MyTrade> GenerateMyTrades(OrderStateResponce orderResp, Order oldOrder)
+        private List<MyTrade> GenerateMyTrades(OrderStateResponce orderResp, Order oldOrder, Security mySecurity)
         {
             List<MyTrade> trades = new List<MyTrade>();
 
@@ -1657,7 +1707,19 @@ namespace OsEngine.Market.Servers.Tinkoff
                 trade.NumberOrderParent = orderResp.orderId;
 
                 trade.Volume = orderResp.stages[i].quantity.ToDecimal();
-                trade.Price = orderResp.stages[i].price.GetValue().ToStringWithNoEndZero().ToDecimal();
+
+                if(oldOrder.SecurityClassCode == "Futures")
+                {
+                    //price / min_price_increment * min_price_increment_amount
+                    decimal price = orderResp.stages[i].price.GetValue().ToStringWithNoEndZero().ToDecimal();
+                    decimal realPrice = (price * mySecurity.PriceStep) / mySecurity.PriceStepCost;
+                    trade.Price = realPrice;
+                }
+                else
+                {
+                    trade.Price = orderResp.stages[i].price.GetValue().ToStringWithNoEndZero().ToDecimal();
+                }
+                
                 trade.NumberTrade = orderResp.stages[i].tradeId;
                 trade.Time = FromIso8601(orderResp.orderDate);
                 trades.Add(trade);

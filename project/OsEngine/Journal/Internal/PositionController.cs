@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.IO;
 using System.Text;
@@ -16,6 +17,7 @@ using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Logging;
 using MessageBox = System.Windows.MessageBox;
+using System.Globalization;
 
 namespace OsEngine.Journal.Internal
 {
@@ -43,12 +45,15 @@ namespace OsEngine.Journal.Internal
         {
             if (_worker == null)
             {
+                _currentCulture = OsLocalization.CurCulture;
                 _worker = new Task(WatcherHome);
                 _worker.Start();
             }
         }
 
         private static Task _worker;
+
+        private static CultureInfo _currentCulture;
 
         /// <summary>
         /// flow location
@@ -72,6 +77,7 @@ namespace OsEngine.Journal.Internal
 
                     controller.SavePositions();
                     controller.TryPaintPositions();
+                    controller.TrySaveStopLimits();
                 }
 
                 if (!MainWindow.ProccesIsWorked)
@@ -89,10 +95,10 @@ namespace OsEngine.Journal.Internal
 
             Activate();
 
-            ControllersToCheck.Add(this);
-
-            if(_startProgram != StartProgram.IsOsOptimizer)
+            if(_startProgram != StartProgram.IsOsOptimizer
+                && _startProgram != StartProgram.IsOsMiner)
             {
+                ControllersToCheck.Add(this);
                 Load();
             }
   
@@ -103,7 +109,6 @@ namespace OsEngine.Journal.Internal
                     position => position.State != PositionStateType.Done
                                 && position.State != PositionStateType.OpeningFail);
             }
-
         }
 
         private StartProgram _startProgram;
@@ -120,8 +125,7 @@ namespace OsEngine.Journal.Internal
         /// </summary>
         private void Load()
         {
-            if (_startProgram == StartProgram.IsOsOptimizer ||
-                _startProgram == StartProgram.IsOsMiner)
+            if (_startProgram == StartProgram.IsOsOptimizer)
             {
                 return;
             }
@@ -156,6 +160,11 @@ namespace OsEngine.Journal.Internal
                 }
 
                 if (deals.Count == 0)
+                {
+                    return;
+                }
+
+                if (_startProgram == StartProgram.IsTester)
                 {
                     return;
                 }
@@ -224,21 +233,49 @@ namespace OsEngine.Journal.Internal
                     }
                 }
 
-                for (int i = 0; i < ControllersToCheck.Count; i++)
+                string dealControllerStopLimitsPath = @"Engine\" + _name + @"DealControllerStopLimits.txt";
+
+                if (File.Exists(dealControllerStopLimitsPath))
                 {
-                    if (ControllersToCheck[i] == null)
+                    try
                     {
-                        ControllersToCheck.RemoveAt(i);
-                        i--;
-                        continue;
+                        File.Delete(dealControllerStopLimitsPath);
                     }
-                    if (ControllersToCheck[i]._name == _name)
+                    catch (Exception error)
                     {
-                        ControllersToCheck.RemoveAt(i);
-                        return;
+                        SendNewLogMessage(error.ToString(), LogMessageType.System);
                     }
                 }
 
+                if (_gridOpenDeal != null)
+                {
+                    _gridOpenDeal.Click -= _gridOpenDeal_Click;
+                    _gridOpenDeal = null;
+
+                }
+                if(_gridCloseDeal != null)
+                {
+                    _gridCloseDeal.Click -= _gridCloseDeal_Click;
+                    _gridCloseDeal = null;
+                }
+               
+                if (_startProgram != StartProgram.IsOsOptimizer)
+                {
+                    for (int i = 0; i < ControllersToCheck.Count; i++)
+                    {
+                        if (ControllersToCheck[i] == null)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            i--;
+                            continue;
+                        }
+                        if (ControllersToCheck[i]._name == _name)
+                        {
+                            ControllersToCheck.RemoveAt(i);
+                            return;
+                        }
+                    }
+                }
             }
             catch (Exception error)
             {
@@ -336,7 +373,8 @@ namespace OsEngine.Journal.Internal
                 return;
             }
 
-            if(_startProgram == StartProgram.IsOsOptimizer)
+            if (_startProgram == StartProgram.IsOsOptimizer
+                || _startProgram == StartProgram.IsOsMiner)
             {
                 return;
             }
@@ -346,6 +384,7 @@ namespace OsEngine.Journal.Internal
             try
             {
                 string positionsString = PositionsToString();
+
                 using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"DealController.txt", false))
                 {
                     writer.Write(positionsString);
@@ -364,7 +403,8 @@ namespace OsEngine.Journal.Internal
             result.Append(_comissionType + "\r\n");
             result.Append(_comissionValue + "\r\n");
 
-            if (_startProgram == StartProgram.IsOsTrader)
+            if (_startProgram == StartProgram.IsOsTrader ||
+                _startProgram == StartProgram.IsOsMiner)
             {
                 List<Position> deals = _deals;
 
@@ -470,13 +510,72 @@ namespace OsEngine.Journal.Internal
                 return;
             }
 
-            _deals.Remove(position);
+            // убираем в общем хранилище
+
+            for (int i = 0; i < _deals.Count; i++)
+            {
+                if (_deals[i].Number == position.Number)
+                {
+                    _deals.RemoveAt(i);
+                    break;
+                }
+            }
+
+            // убираем в хранилищах открытых позиций
 
             for (int i = 0; i < _openPositions.Count; i++)
             {
                 if (_openPositions[i].Number == position.Number)
                 {
                     _openPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _openLongPosition != null && i < _openLongPosition.Count; i++)
+            {
+                if (_openLongPosition[i].Number == position.Number)
+                {
+                    _openLongPosition.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _openShortPositions != null && i < _openShortPositions.Count; i++)
+            {
+                if (_openShortPositions[i].Number == position.Number)
+                {
+                    _openShortPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            // убираем из хранилищь закрытых позиций
+
+            for (int i = 0; _closePositions != null && i < _closePositions.Count; i++)
+            {
+                if (_closePositions[i].Number == position.Number)
+                {
+                    _closePositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _closeLongPositions != null && i < _closeLongPositions.Count; i++)
+            {
+                if (_closeLongPositions[i].Number == position.Number)
+                {
+                    _closeLongPositions.RemoveAt(i);
+                    break;
+                }
+            }
+
+            for (int i = 0; _closeShortPositions != null &&  i < _closeShortPositions.Count; i++)
+            {
+                if (_closeShortPositions[i].Number == position.Number)
+                {
+                    _closeShortPositions.RemoveAt(i);
+                    break;
                 }
             }
 
@@ -586,7 +685,7 @@ namespace OsEngine.Journal.Internal
                 return;
             }
 
-            for (int i = _deals.Count - 1; i > _deals.Count - 150 && i > -1; i--)
+            for (int i = _deals.Count - 1; i > -1; i--)
             {
                 Position position = _deals[i];
 
@@ -596,8 +695,9 @@ namespace OsEngine.Journal.Internal
                 {
                     for (int indexCloseOrd = 0; indexCloseOrd < position.CloseOrders.Count; indexCloseOrd++)
                     {
-                        if (position.CloseOrders[indexCloseOrd].NumberMarket == trade.NumberOrderParent ||
-                            position.CloseOrders[indexCloseOrd].NumberUser.ToString() == trade.NumberOrderParent)
+                        if (position.CloseOrders[indexCloseOrd].NumberMarket == trade.NumberOrderParent 
+                            //|| position.CloseOrders[indexCloseOrd].NumberUser.ToString() == trade.NumberOrderParent
+                            )
                         {
                             isCloseOrder = true;
                             break;
@@ -611,8 +711,9 @@ namespace OsEngine.Journal.Internal
                 {
                     for (int indOpenOrd = 0; indOpenOrd < position.OpenOrders.Count; indOpenOrd++)
                     {
-                        if (position.OpenOrders[indOpenOrd].NumberMarket == trade.NumberOrderParent ||
-                            position.OpenOrders[indOpenOrd].NumberUser.ToString() == trade.NumberOrderParent)
+                        if (position.OpenOrders[indOpenOrd].NumberMarket == trade.NumberOrderParent 
+                            //|| position.OpenOrders[indOpenOrd].NumberUser.ToString() == trade.NumberOrderParent
+                            )
                         {
                             isOpenOrder = true;
                             break;
@@ -650,6 +751,7 @@ namespace OsEngine.Journal.Internal
                     }
 
                     ProcesPosition(position);
+                    break;
                 }
             }
             _neadToSave = true;
@@ -699,6 +801,125 @@ namespace OsEngine.Journal.Internal
         /// пустой лист который мы возвращаем вместо null при запросе массивов
         /// </summary>
         private List<Position> _emptyList = new List<Position>();
+
+        #region StopLimits
+
+        public void SetStopLimits(List<PositionOpenerToStopLimit> stopLimits)
+        {
+            _actualStopLimits = stopLimits;
+            _neadToSaveStopLimit = true;
+        }
+
+        private List<PositionOpenerToStopLimit> _actualStopLimits;
+
+        private bool _neadToSaveStopLimit;
+
+        private void TrySaveStopLimits()
+        {
+            if (_startProgram == StartProgram.IsOsOptimizer
+           || _startProgram == StartProgram.IsOsMiner)
+            {
+                return;
+            }
+
+            if (_neadToSaveStopLimit == false)
+            {
+                return;
+            }
+
+            _neadToSaveStopLimit = false;
+
+            if(_actualStopLimits == null
+               || _actualStopLimits.Count == 0)
+            { // очищаем файл от записей
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"DealControllerStopLimits.txt", false))
+                {
+                    
+                }
+                return;
+            }
+
+            try
+            {
+                string positionsString = "";
+
+                for(int i = 0;i < _actualStopLimits.Count;i++)
+                {
+                    if (_actualStopLimits[i].LifeTimeType == PositionOpenerToStopLifeTimeType.NoLifeTime)
+                    {
+                        positionsString += _actualStopLimits[i].GetSaveString() + "\n";
+                    }
+                }
+
+                using (StreamWriter writer = new StreamWriter(@"Engine\" + _name + @"DealControllerStopLimits.txt", false))
+                {
+                    writer.Write(positionsString);
+                }
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+
+        }
+
+        public List<PositionOpenerToStopLimit> LoadStopLimits()
+        {
+            try
+            {
+                if(_startProgram != StartProgram.IsOsTrader)
+                {
+                    return null;
+                }
+
+                if(File.Exists(@"Engine\" + _name + @"DealControllerStopLimits.txt") == false)
+                {
+                    return null;
+                }
+
+                // 1 count the number of transactions in the file
+                //1 считаем кол-во сделок в файле
+
+                List<string> orders = new List<string>();
+
+
+
+                using (StreamReader reader = new StreamReader(@"Engine\" + _name + @"DealControllerStopLimits.txt"))
+                {
+                    while (!reader.EndOfStream)
+                    {
+                        orders.Add(reader.ReadLine());
+                    }
+                }
+
+                List<PositionOpenerToStopLimit> stopLimits = new List<PositionOpenerToStopLimit>();
+
+                for (int i = 0;i < orders.Count;i++)
+                {
+                    string str = orders[i];
+
+                    if(String.IsNullOrEmpty(str))
+                    {
+                        continue;
+                    }
+
+                    PositionOpenerToStopLimit stop = new PositionOpenerToStopLimit();
+                    stop.LoadFromString(str);
+                    stopLimits.Add(stop);   
+                }
+
+                return stopLimits;
+            }
+            catch (Exception error)
+            {
+                SendNewLogMessage(error.ToString(), LogMessageType.Error);
+            }
+
+            return null;
+        }
+
+
+        #endregion
 
         // last position последняя позиция
 
@@ -992,6 +1213,7 @@ namespace OsEngine.Journal.Internal
         {
             return _deals.Find(position => position.Number == number);
         }
+
         // Drawing of positions in the tables
         // прорисовка позиций в таблицах
 
@@ -1185,7 +1407,7 @@ namespace OsEngine.Journal.Internal
                 _hostOpenDeal = null;
                 _hostCloseDeal = null;
             }
-            _positionsToPaint = null;
+            _positionsToPaint.Clear();
         }
 
         /// <summary>
@@ -1292,9 +1514,16 @@ namespace OsEngine.Journal.Internal
         {
             try
             {
-                nRow.Cells[1].Value = position.TimeOpen;
+                nRow.Cells[1].Value = position.TimeOpen.ToString(_currentCulture);
 
-                nRow.Cells[2].Value = position.TimeClose;
+                if (position.TimeClose != position.TimeOpen)
+                {
+                    nRow.Cells[2].Value = position.TimeClose.ToString(_currentCulture);
+                }
+                else
+                {
+                    nRow.Cells[2].Value = "";
+                }
 
                 nRow.Cells[3].Value = position.NameBot;
 
@@ -1387,6 +1616,14 @@ namespace OsEngine.Journal.Internal
                 }
 
                 _positionsToPaint.Add(position);
+
+                if(_startProgram == StartProgram.IsTester)
+                {
+                    if(_positionsToPaint.Count > 200)
+                    {
+                        _positionsToPaint.RemoveAt(0);
+                    }
+                }
             }
             catch
             {
@@ -1415,10 +1652,18 @@ namespace OsEngine.Journal.Internal
                 nRow.Cells[0].Value = position.Number;
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[1].Value = position.TimeOpen;
+                nRow.Cells[1].Value = position.TimeOpen.ToString(_currentCulture);
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[2].Value = position.TimeClose;
+
+                if (position.TimeClose != position.TimeOpen)
+                {
+                    nRow.Cells[2].Value = position.TimeClose.ToString(_currentCulture);
+                }
+                else
+                {
+                    nRow.Cells[2].Value = "";
+                }
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
                 nRow.Cells[3].Value = position.NameBot;
@@ -1517,7 +1762,7 @@ namespace OsEngine.Journal.Internal
 
             try
             {
-                MenuItem[] items = new MenuItem[7];
+                MenuItem[] items = new MenuItem[6];
 
                 items[0] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem1 };
                 items[0].Click += PositionCloseAll_Click;
@@ -1528,17 +1773,14 @@ namespace OsEngine.Journal.Internal
                 items[2] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem3 };
                 items[2].Click += PositionCloseForNumber_Click;
 
-                items[3] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem4 };
-                items[3].Click += PositionModificationForNumber_Click;
+                items[3] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem5 };
+                items[3].Click += PositionNewStop_Click;
 
-                items[4] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem5 };
-                items[4].Click += PositionNewStop_Click;
+                items[4] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem6 };
+                items[4].Click += PositionNewProfit_Click;
 
-                items[5] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem6 };
-                items[5].Click += PositionNewProfit_Click;
-
-                items[6] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem7 };
-                items[6].Click += PositionClearDelete_Click;
+                items[5] = new MenuItem { Text = OsLocalization.Journal.PositionMenuItem7 };
+                items[5].Click += PositionClearDelete_Click;
 
                 ContextMenu menu = new ContextMenu(items);
 
@@ -1610,9 +1852,7 @@ namespace OsEngine.Journal.Internal
             }
         }
 
-
         // work with context menu
-        // работа с контекстным меню
 
         /// <summary>
         /// the user has ordered the opening of a new position
@@ -1646,6 +1886,14 @@ namespace OsEngine.Journal.Internal
                     return;
                 }
 
+                AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message5);
+                ui.ShowDialog();
+
+                if (ui.UserAcceptActioin == false)
+                {
+                    return;
+                }
+
                 if (UserSelectActionEvent != null)
                 {
                     UserSelectActionEvent(null, SignalType.CloseAll);
@@ -1668,6 +1916,12 @@ namespace OsEngine.Journal.Internal
                 int number;
                 try
                 {
+                    if (_gridOpenDeal.Rows == null ||
+                        _gridOpenDeal.Rows.Count == 0 ||
+                        _gridOpenDeal.CurrentCell == null)
+                    {
+                        return;
+                    }
                     number = Convert.ToInt32(_gridOpenDeal.Rows[_gridOpenDeal.CurrentCell.RowIndex].Cells[0].Value);
                 }
                 catch (Exception)
@@ -1679,36 +1933,6 @@ namespace OsEngine.Journal.Internal
                 if (UserSelectActionEvent != null)
                 {
                     UserSelectActionEvent(GetPositionForNumber(number), SignalType.CloseOne);
-                }
-            }
-            catch (Exception error)
-            {
-                SendNewLogMessage(error.ToString(), LogMessageType.Error);
-            }
-        }
-
-        /// <summary>
-        /// the user has ordered a position modification
-        /// пользователь заказал модификацию позиции
-        /// </summary>
-        void PositionModificationForNumber_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                int number;
-                try
-                {
-                    number = Convert.ToInt32(_gridOpenDeal.Rows[_gridOpenDeal.CurrentCell.RowIndex].Cells[0].Value);
-                }
-                catch (Exception)
-                {
-                    return;
-                }
-
-
-                if (UserSelectActionEvent != null)
-                {
-                    UserSelectActionEvent(GetPositionForNumber(number), SignalType.Modificate);
                 }
             }
             catch (Exception error)
@@ -1783,6 +2007,14 @@ namespace OsEngine.Journal.Internal
         {
             try
             {
+                AcceptDialogUi ui = new AcceptDialogUi(OsLocalization.Journal.Message3);
+                ui.ShowDialog();
+
+                if (ui.UserAcceptActioin == false)
+                {
+                    return;
+                }
+
                 int number;
                 try
                 {

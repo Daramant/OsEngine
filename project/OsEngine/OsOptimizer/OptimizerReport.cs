@@ -102,6 +102,10 @@ namespace OsEngine.OsOptimizer
                 {
                     result += ((StrategyParameterTimeOfDay)parameters[i]).Value;
                 }
+                else if (parameters[i].Type == StrategyParameterType.CheckBox)
+                {
+                    result += ((StrategyParameterCheckBox)parameters[i]).CheckState;
+                }
 
                 result += "\n";
             }
@@ -156,6 +160,11 @@ namespace OsEngine.OsOptimizer
                     param = new StrategyParameterLabel(name,"","",0,0,System.Drawing.Color.White);
                     param.LoadParamFromString(StrategyParameters[i].Split('$')[1].Split('#'));
                 }
+                else if (type == StrategyParameterType.CheckBox)
+                {
+                    param = new StrategyParameterCheckBox(name, false);
+                    param.LoadParamFromString(StrategyParameters[i].Split('$')[1].Split('#'));
+                }
 
                 par.Add(param);
             }
@@ -198,14 +207,13 @@ namespace OsEngine.OsOptimizer
 
                 tab.AverageProfit = tab.TotalProfit / (posesArray.Length+1);
                 
-                tab.AverageProfitPercent = PositionStaticticGenerator.GetMidleProfitInPersent(posesArray);
+                tab.AverageProfitPercentOneContract = PositionStaticticGenerator.GetMidleProfitInPersentOneContract(posesArray);
 
                 tab.ProfitFactor = PositionStaticticGenerator.GetProfitFactor(posesArray);
                 tab.Recovery = PositionStaticticGenerator.GetRecovery(posesArray);
                 tab.PayOffRatio = PositionStaticticGenerator.GetPayOffRatio(posesArray);
+                tab.SharpRatio = PositionStaticticGenerator.GetSharpRatio(posesArray,7);
                 tab.TabType = bot.TabsSimple[i].GetType().Name;
-
-                
             }
 
             if (TabsReports.Count == 0)
@@ -222,11 +230,12 @@ namespace OsEngine.OsOptimizer
                 TotalProfitPersent = TabsReports[0].TotalProfitPersent;
                 MaxDrowDawn = TabsReports[0].MaxDrowDawn;
                 AverageProfit = TabsReports[0].AverageProfit;
-                AverageProfitPercent = TabsReports[0].AverageProfitPercent;
+                AverageProfitPercentOneContract = TabsReports[0].AverageProfitPercentOneContract;
 
                 ProfitFactor = TabsReports[0].ProfitFactor;
                 Recovery = TabsReports[0].Recovery;
                 PayOffRatio = TabsReports[0].PayOffRatio;
+                SharpRatio = TabsReports[0].SharpRatio;
             }
             else
             {
@@ -239,10 +248,11 @@ namespace OsEngine.OsOptimizer
                 TotalProfitPersent = PositionStaticticGenerator.GetAllProfitPersent(posesArray);
                 MaxDrowDawn = PositionStaticticGenerator.GetMaxDownPersent(posesArray);
                 AverageProfit = PositionStaticticGenerator.GetMidleProfitInPunkt(posesArray);
-                AverageProfitPercent = PositionStaticticGenerator.GetMidleProfitInPersent(posesArray);
+                AverageProfitPercentOneContract = PositionStaticticGenerator.GetMidleProfitInPersentOneContract(posesArray);
                 ProfitFactor = PositionStaticticGenerator.GetProfitFactor(posesArray);
                 Recovery = PositionStaticticGenerator.GetRecovery(posesArray);
                 PayOffRatio = PositionStaticticGenerator.GetPayOffRatio(posesArray);
+                SharpRatio = PositionStaticticGenerator.GetSharpRatio(posesArray, 7);
             }
         }
 
@@ -256,13 +266,15 @@ namespace OsEngine.OsOptimizer
 
         public decimal AverageProfit;
 
-        public decimal AverageProfitPercent;
+        public decimal AverageProfitPercentOneContract;
 
         public decimal ProfitFactor;
 
         public decimal PayOffRatio;
 
         public decimal Recovery;
+
+        public decimal SharpRatio;
 
         public string GetSaveString()
         {
@@ -274,11 +286,12 @@ namespace OsEngine.OsOptimizer
             result += TotalProfit + "@";
             result += MaxDrowDawn + "@";
             result += AverageProfit + "@";
-            result += AverageProfitPercent + "@";
+            result += AverageProfitPercentOneContract + "@";
             result += ProfitFactor + "@";
             result += PayOffRatio + "@";
             result += Recovery + "@";
             result += TotalProfitPersent + "@";
+            result += SharpRatio + "@";
 
             // сохраняем параметры в строковом представлении
             string param = "";
@@ -312,20 +325,21 @@ namespace OsEngine.OsOptimizer
             TotalProfit = Convert.ToDecimal(str[2]);
             MaxDrowDawn = Convert.ToDecimal(str[3]);
             AverageProfit = Convert.ToDecimal(str[4]);
-            AverageProfitPercent = Convert.ToDecimal(str[5]);
+            AverageProfitPercentOneContract = Convert.ToDecimal(str[5]);
             ProfitFactor = Convert.ToDecimal(str[6]);
             PayOffRatio = Convert.ToDecimal(str[7]);
             Recovery = Convert.ToDecimal(str[8]);
             TotalProfitPersent = Convert.ToDecimal(str[9]);
+            SharpRatio = Convert.ToDecimal(str[10]);
 
-            string [] param = str[10].Split('&');
+            string [] param = str[11].Split('&');
 
             for(int i = 0;i < param.Length-1;i++)
             {
                 StrategyParameters.Add(param[i]);
             }
 
-            string [] reportTabs = str[11].Split('&');
+            string [] reportTabs = str[12].Split('&');
 
             for(int i = 0;i < reportTabs.Length-1;i++)
             {
@@ -352,13 +366,15 @@ namespace OsEngine.OsOptimizer
 
         public decimal AverageProfit;
 
-        public decimal AverageProfitPercent;
+        public decimal AverageProfitPercentOneContract;
 
         public decimal ProfitFactor;
 
         public decimal PayOffRatio;
 
         public decimal Recovery;
+
+        public decimal SharpRatio;
 
         public string GetSaveString()
         {
@@ -370,11 +386,12 @@ namespace OsEngine.OsOptimizer
             result += TotalProfit + "*";
             result += MaxDrowDawn + "*";
             result += AverageProfit + "*";
-            result += AverageProfitPercent + "*";
+            result += AverageProfitPercentOneContract + "*";
             result += ProfitFactor + "*";
             result += PayOffRatio + "*";
             result += Recovery + "*";
             result += TotalProfitPersent + "*";
+            result += SharpRatio + "*";
 
             return result;
         }
@@ -389,11 +406,18 @@ namespace OsEngine.OsOptimizer
             TotalProfit = save[3].ToDecimal();
             MaxDrowDawn = save[4].ToDecimal();
             AverageProfit = save[5].ToDecimal();
-            AverageProfitPercent = save[6].ToDecimal();
+            AverageProfitPercentOneContract = save[6].ToDecimal();
             ProfitFactor = save[7].ToDecimal();
             PayOffRatio = save[8].ToDecimal();
             Recovery = save[9].ToDecimal();
             TotalProfitPersent = save[10].ToDecimal();
+
+            if(save.Length == 11)
+            {
+                return;
+            }
+
+            SharpRatio = save[11].ToDecimal();
         }
     }
 }

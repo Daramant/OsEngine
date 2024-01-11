@@ -92,9 +92,19 @@ namespace OsEngine.Market.Servers.Tinkoff
 
         #region Trade permission
 
+        public bool MarketOrdersIsSupport
+        {
+            get { return false; }
+        }
+
         public bool IsTradeServer
         {
             get { return true; }
+        }
+
+        public bool IsCanChangeOrderPrice
+        {
+            get { return false; }
         }
 
         public TimeFramePermission TradeTimeFramePermission
@@ -102,7 +112,7 @@ namespace OsEngine.Market.Servers.Tinkoff
             get { return _tradeTimeFramePermission; }
         }
 
-        public int WaitTimeAfterFirstStartToSendOrders
+        public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
             get { return 5; }
         }
@@ -129,8 +139,34 @@ namespace OsEngine.Market.Servers.Tinkoff
                 TimeFrameHour1IsOn = true,
                 TimeFrameHour2IsOn = true,
                 TimeFrameHour4IsOn = true,
-                TimeFrameDayIsOn = true
+                TimeFrameDayIsOn = false
             };
+
+
+        public bool UseStandartCandlesStarter
+        {
+            get { return false; }
+        }
+
+        public bool IsUseLotToCalculateProfit
+        {
+            get { return true; }
+        }
+
+        public bool ManuallyClosePositionOnBoard_IsOn
+        {
+            get { return false; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
+        {
+            get { return null; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
+        {
+            get { return null; }
+        }
 
         #endregion
     }

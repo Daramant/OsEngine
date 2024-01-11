@@ -346,14 +346,6 @@ namespace OsEngine.Market.Servers.Finam
         /// </summary>
         private void CheckServer()
         {
-            String pageContent = GetPage("http://" + ServerAdress);
-
-            if (pageContent.Length == 0)
-            { // if there is no content, we exit / если нет контента - выходим
-                SendLogMessage(OsLocalization.Market.Message51, LogMessageType.Error);
-                return;
-            }
-
             ServerStatus = ServerConnectStatus.Connect;
 
             Thread.Sleep(10000);
@@ -361,24 +353,31 @@ namespace OsEngine.Market.Servers.Finam
 
         public static string GetPage(string uri)
         {
-            if (ServicePointManager.SecurityProtocol != SecurityProtocolType.Tls12)
+            try
             {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                if (ServicePointManager.SecurityProtocol != SecurityProtocolType.Tls12)
+                {
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                }
+
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
+                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+
+                string resultPage = "";
+
+                using (StreamReader sr = new StreamReader(response.GetResponseStream(), Encoding.Default, true))
+                {
+                    resultPage = sr.ReadToEnd();
+                    sr.Close();
+                }
+
+
+                return resultPage;
             }
-
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
-            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-
-            string resultPage = "";
-
-            using (StreamReader sr = new StreamReader(response.GetResponseStream(), Encoding.Default, true))
+            catch
             {
-                resultPage = sr.ReadToEnd();
-                sr.Close();
+                return null;
             }
-
-
-            return resultPage;
         }
 
         private static string GetSecFromFile()
@@ -413,6 +412,12 @@ namespace OsEngine.Market.Servers.Finam
         public static string GetIchartsPath()
         {
             var response = GetPage("https://www.finam.ru/profile/moex-akcii/gazprom/export/");
+
+            if(response == null)
+            {
+                return null;
+            }
+
             return Regex.Match(response, @"\/cache\/.*\/icharts\/icharts\.js", RegexOptions.IgnoreCase).Value;
         }
 
@@ -423,20 +428,29 @@ namespace OsEngine.Market.Servers.Finam
         private void GetSecurities()
         {
             string response = "";
+            bool errorOnPage = false;
 
             try
             {
                 string path = $"https://www.finam.ru{GetIchartsPath()}";
 
                 response = GetPage(path);
+
+                string[] arra = response.Split('=');
+                string[] arr = arra[1].Split('[')[1].Split(']')[0].Split(',');
+
             }
             catch (Exception e)
             {
                 SendLogMessage("Tools data loading error.\r\nLoading tools data from cache.\r\nTools data may be obsolete. Error data:\r\n" + e, LogMessageType.System);
                 //response = GetSecFromFile();
+                errorOnPage = true;
             }
 
-            if (response == "" || response.Contains("Страница недоступна"))
+            if (response == null 
+                || response == "" 
+                || response.Contains("Страница недоступна")
+                || errorOnPage)
             {
                 response = GetSecFromFile();
             }
@@ -993,7 +1007,7 @@ namespace OsEngine.Market.Servers.Finam
         /// <param name="neadToUpdate">whether to automatically update / нужно ли автоматически обновлять</param>
         /// <returns>In case of luck, returns CandleSeries / В случае удачи возвращает CandleSeries
         /// in case of failure null / в случае неудачи null</returns>
-        public CandleSeries GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
+        public List<Candle> GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
             DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
         {
             try
@@ -1071,16 +1085,16 @@ namespace OsEngine.Market.Servers.Finam
                         _finamDataSeries = new List<FinamDataSeries>();
                     }
 
-                    _finamDataSeries.Add(finamDataSeries);
-
+                    // _finamDataSeries.Add(finamDataSeries);
+                    finamDataSeries.Process();
                     Thread.Sleep(2000);
 
-                    SendLogMessage(OsLocalization.Market.Label7 + series.Security.Name +
+                    /*SendLogMessage(OsLocalization.Market.Label7 + series.Security.Name +
                                    OsLocalization.Market.Label10 + series.TimeFrame +
                                    OsLocalization.Market.Message16,
-                        LogMessageType.System);
+                        LogMessageType.System);*/
 
-                    return series;
+                    return series.CandlesAll;
                 }
             }
             catch (Exception error)
@@ -1095,13 +1109,13 @@ namespace OsEngine.Market.Servers.Finam
         /// взять тиковые данные по инструменту за определённый период
         /// </summary>
         /// <returns></returns>
-        public bool GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
+        public List<Trade> GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
             try
             {
                 if (LastStartServerTime.AddSeconds(5) > DateTime.Now)
                 {
-                    return false;
+                    return null;
                 }
 
                 // one by one / дальше по одному
@@ -1109,24 +1123,24 @@ namespace OsEngine.Market.Servers.Finam
                 {
                     if (securityName == null)
                     {
-                        return false;
+                        return null;
                     }
                     // need to start the server if it is still disabled / надо запустить сервер если он ещё отключен
                     if (ServerStatus != ServerConnectStatus.Connect)
                     {
                         //MessageBox.Show("Сервер не запущен. Скачивание данных прервано. Инструмент: " + namePaper);
-                        return false;
+                        return null;
                     }
 
                     if (_securities == null)
                     {
                         Thread.Sleep(5000);
-                        return false;
+                        return null;
                     }
                     if (LastStartServerTime != DateTime.MinValue &&
                         LastStartServerTime.AddSeconds(15) > DateTime.Now)
                     {
-                        return false;
+                        return null;
                     }
 
                     Security security = null;
@@ -1143,7 +1157,7 @@ namespace OsEngine.Market.Servers.Finam
 
                     if (security == null)
                     {
-                        return false;
+                        return null;
                     }
 
 
@@ -1156,31 +1170,19 @@ namespace OsEngine.Market.Servers.Finam
                     finamDataSeries.TimeEnd = endTime;
                     finamDataSeries.TimeStart = startTime;
                     finamDataSeries.IsTick = true;
-                    finamDataSeries.TradesUpdateEvent += finamDataSecies_TradesFilesUpdateEvent;
                     finamDataSeries.NeadToUpdeate = neadToUpdete;
                     finamDataSeries.LogMessageEvent += SendLogMessage;
 
-                    if (_finamDataSeries == null)
-                    {
-                        _finamDataSeries = new List<FinamDataSeries>();
-                    }
+                    finamDataSeries.Process();
 
-                    _finamDataSeries.Add(finamDataSeries);
 
-                    Thread.Sleep(2000);
-
-                    SendLogMessage(OsLocalization.Market.Label7 + security.Name +
-                                   OsLocalization.Market.Label10 + " Tick" +
-                                   OsLocalization.Market.Message16,
-                        LogMessageType.System);
-
-                    return true;
+                    return finamDataSeries.Trades;
                 }
             }
             catch (Exception error)
             {
                 SendLogMessage(error.ToString(), LogMessageType.Error);
-                return false;
+                return null;
             }
         }
 
@@ -1234,8 +1236,10 @@ namespace OsEngine.Market.Servers.Finam
 
         private void ThreadDownLoaderArea()
         {
+            return;
             while (true)
             {
+
                 Thread.Sleep(5000);
 
                 if (LastStartServerTime.AddSeconds(15) > DateTime.Now)
@@ -1476,6 +1480,16 @@ namespace OsEngine.Market.Servers.Finam
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel order
         /// отменить ордер
         /// </summary>
@@ -1491,6 +1505,11 @@ namespace OsEngine.Market.Servers.Finam
         public void CancelAllOrders()
         {
 
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -1684,63 +1703,15 @@ namespace OsEngine.Market.Servers.Finam
 
                 LoadedOnce = true;
 
-                SendLogMessage(SecurityFinam.Name + OsLocalization.Market.Message54 + _timeFrame, LogMessageType.System);
+                //SendLogMessage(SecurityFinam.Name + OsLocalization.Market.Message54 + _timeFrame, LogMessageType.System);
 
                 if (IsTick == false)
                 {
-                    if (TimeFrame == TimeFrame.Sec1 ||
-                        TimeFrame == TimeFrame.Sec10 ||
-                        TimeFrame == TimeFrame.Sec15 ||
-                        TimeFrame == TimeFrame.Sec2 ||
-                        TimeFrame == TimeFrame.Sec20 ||
-                        TimeFrame == TimeFrame.Sec30 ||
-                        TimeFrame == TimeFrame.Sec5)
+                    List<Candle> candles = GetCandles();
+
+                    for (int i = 0; candles != null && i < candles.Count; i++)
                     {
-                        List<string> trades = GetTrades();
-
-                        List<Trade> listTrades = new List<Trade>();
-                        Trade newTrade = new Trade();
-
-                        for (int i = 0; trades != null && i < trades.Count; i++)
-                        {
-                            if (trades[i] == null)
-                            {
-                                continue;
-                            }
-                            StreamReader reader = new StreamReader(trades[i]);
-
-                            while (!reader.EndOfStream)
-                            {
-                                try
-                                {
-                                    newTrade.SetTradeFromString(reader.ReadLine());
-
-                                    if (newTrade.Time.Hour < 10)
-                                    {
-                                        continue;
-                                    }
-                                    listTrades.Add(newTrade);
-                                    Series.SetNewTicks(listTrades);
-                                    TimeActual = newTrade.Time;
-                                }
-                                catch
-                                {
-                                    // ignore
-                                }
-
-                            }
-                            reader.Close();
-                        }
-                        listTrades.Clear();
-                    }
-                    else
-                    {
-                        List<Candle> candles = GetCandles();
-
-                        for (int i = 0; candles != null && i < candles.Count; i++)
-                        {
-                            Series.SetNewCandleInArray(candles[i]);
-                        }
+                        Series.SetNewCandleInArray(candles[i]);
                     }
 
                     if (CandleUpdateEvent != null)
@@ -1750,20 +1721,96 @@ namespace OsEngine.Market.Servers.Finam
                 }
                 else //if (IsTick == true)
                 {
-                    List<string> trades = GetTrades();
+                    List<string> trades = GetTradesPath();
 
-                    if (TradesUpdateEvent != null)
+                    List<Trade> listTrades = new List<Trade>();
+
+                    for (int i = 0; trades != null && i < trades.Count; i++)
                     {
-                        TradesUpdateEvent(trades);
+                        if (trades[i] == null)
+                        {
+                            continue;
+                        }
+                        StreamReader reader = new StreamReader(trades[i]);
+
+                        while (!reader.EndOfStream)
+                        {
+                            try
+                            {
+                                Trade newTrade = new Trade();
+                                newTrade.SetTradeFromString(reader.ReadLine());
+                                listTrades.Add(newTrade);
+                                TimeActual = newTrade.Time;
+                            }
+                            catch
+                            {
+                                // ignore
+                            }
+
+                        }
+                        reader.Close();
                     }
+
+                    if (listTrades.Count == 0)
+                    {
+                        return;
+                    }
+
+                    Trades = listTrades;
                 }
             }
             catch (Exception error)
             {
                 SendLogMessage(error.ToString(), LogMessageType.Error);
             }
-            SendLogMessage(SecurityFinam.Name + OsLocalization.Market.Message55 + _timeFrame, LogMessageType.System);
+            //SendLogMessage(SecurityFinam.Name + OsLocalization.Market.Message55 + _timeFrame, LogMessageType.System);
         }
+
+        private List<Trade> GetTradesFromFolder(string pathToFolder)
+        {
+            /*if (files.Length != 0)
+            {
+                if (writer != null)
+                {
+                    writer.Close();
+                    writer = null;
+                }
+
+                try
+                {
+                    using (StreamReader reader = new StreamReader(files[0]))
+                    {
+                        string str = "";
+                        while (!reader.EndOfStream)
+                        {
+
+                            str = reader.ReadLine();
+
+                        }
+                        if (str != "")
+                        {
+                            Trade trade = new Trade();
+                            trade.SetTradeFromString(str);
+                            tradeSaveInfo.LastSaveObjectTime = trade.Time;
+                            tradeSaveInfo.LastTradeId = trade.Id;
+                        }
+
+                    }
+                }
+                catch (Exception error)
+                {
+                    if (NewLogMessageEvent != null)
+                    {
+                        NewLogMessageEvent(error.ToString(), LogMessageType.Error);
+                    }
+
+                    return;
+                }
+            }*/
+            return null;
+        }
+
+        public List<Trade> Trades;
 
         /// <summary>
         /// whether need to update the series automatically
@@ -1782,7 +1829,7 @@ namespace OsEngine.Market.Servers.Finam
         /// обновить трейды
         /// </summary>
         /// <returns></returns>
-        private List<string> GetTrades()
+        private List<string> GetTradesPath()
         {
             DateTime timeStart = TimeStart;
 
@@ -1800,7 +1847,7 @@ namespace OsEngine.Market.Servers.Finam
 
             List<string> trades = new List<string>();
 
-            while (timeStart.Date != timeEnd.Date)
+            while (timeStart.Date < timeEnd.Date)
             {
                 string tradesOneDay = GetTrades(timeStart.Date, timeStart.Date,1);
                 timeStart = timeStart.AddDays(1);
@@ -1832,8 +1879,8 @@ namespace OsEngine.Market.Servers.Finam
         /// <returns></returns>
         private string GetTrades(DateTime timeStart, DateTime timeEnd, int iteration)
         {
-            SendLogMessage(OsLocalization.Market.Message56 + SecurityFinam.Name +
-                           OsLocalization.Market.Message57 + timeStart.Date, LogMessageType.System);
+           /* SendLogMessage(OsLocalization.Market.Message56 + SecurityFinam.Name +
+                           OsLocalization.Market.Message57 + timeStart.Date, LogMessageType.System);*/
             //http://195.128.78.52/GBPUSD_141201_141206.csv?market=5&em=86&code=GBPUSD&df=1&mf=11&yf=2014&from=01.12.2014&dt=6&mt=11&yt=2014&to=06.12.2014&
             //p=2&f=GBPUSD_141201_141206&e=.csv&cn=GBPUSD&dtf=1&tmf=3&MSOR=1&mstime=on&mstimever=1&sep=3&sep2=1&datf=5&at=1
 
@@ -1895,7 +1942,7 @@ namespace OsEngine.Market.Servers.Finam
 
             string urlToSec = SecurityFinam.Name + "_" + timeStartInStrToName + "_" + timeEndInStrToName;
 
-            string url = ServerPrefics + "/" + urlToSec + ".txt?";
+            string url = ServerPrefics + "/" + "export9.out?";
 
             url += "market=" + SecurityFinam.MarketId + "&";
             url += "em=" + SecurityFinam.Id + "&";
@@ -1904,7 +1951,7 @@ namespace OsEngine.Market.Servers.Finam
             url += "mf=" + (timeStart.Month - 1) + "&";
             url += "yf=" + (timeStart.Year) + "&";
             url += "from=" + timeFrom + "&";
-
+            url += "apply=0&";
             url += "dt=" + (timeEnd.Day) + "&";
             url += "mt=" + (timeEnd.Month - 1) + "&";
             url += "yt=" + (timeEnd.Year) + "&";
@@ -2083,7 +2130,7 @@ namespace OsEngine.Market.Servers.Finam
 
             if (TimeActual != DateTime.MinValue)
             {
-                timeStart = TimeActual;
+                TimeActual = timeStart;
             }
 
             List<Candle> candles = new List<Candle>();
@@ -2124,10 +2171,10 @@ namespace OsEngine.Market.Servers.Finam
         /// <returns></returns>
         private List<Candle> GetCandles(DateTime timeStart, DateTime timeEnd)
         {
-            SendLogMessage(OsLocalization.Market.Message58 + SecurityFinam.Name +
+            /*SendLogMessage(OsLocalization.Market.Message58 + SecurityFinam.Name +
                            OsLocalization.Market.Label10 + TimeFrame +
                            OsLocalization.Market.Label26 + timeStart.Date +
-                           OsLocalization.Market.Label27 + timeEnd.Date, LogMessageType.System);
+                           OsLocalization.Market.Label27 + timeEnd.Date, LogMessageType.System);*/
             //http://195.128.78.52/GBPUSD_141201_141206.csv?market=5&em=86&code=GBPUSD&df=1&mf=11&yf=2014&from=01.12.2014&dt=6&mt=11&yt=2014&to=06.12.2014&
             //p=2&f=GBPUSD_141201_141206&e=.csv&cn=GBPUSD&dtf=1&tmf=3&MSOR=1&mstime=on&mstimever=1&sep=3&sep2=1&datf=5&at=1
 
@@ -2144,7 +2191,7 @@ namespace OsEngine.Market.Servers.Finam
 
             string fileName = SecurityFinam.Name + "_" + timeStartInStrToName + "_" + timeEndInStrToName;
 
-            string url = ServerPrefics + "/" + fileName + ".txt?";
+            string url = ServerPrefics + "/" + "export9.out?";
 
             url += "market=" + SecurityFinam.MarketId + "&";
             url += "em=" + SecurityFinam.Id + "&";
@@ -2158,7 +2205,7 @@ namespace OsEngine.Market.Servers.Finam
             url += "mt=" + (timeEnd.Month - 1) + "&";
             url += "yt=" + (timeEnd.Year) + "&";
             url += "to=" + timeTo + "&";
-
+            url += "apply=0&";
             url += "p=" + _timeFrameFinam + "&";
             url += "f=" + fileName + "&";
             url += "e=" + ".txt" + "&";
@@ -2174,6 +2221,8 @@ namespace OsEngine.Market.Servers.Finam
             url += "at=" + "0";
 
             WebClient wb = new WebClient();
+
+            //url = "http://export.finam.ru/export9.out?market=1&em=16842&code=GAZP&df=26&mf=8&yf=2023&from=26.09.2023&dt=28&mt=8&yt=2023&to=28.09.2023&p=3&f=GAZP_20230926_20230928&e=.txt&cn=GAZP&dtf=1&tmf=1&MSOR=0&mstime=on&mstimever=1&sep=3&sep2=1&datf=5&at=0";
 
             string response = wb.DownloadString(url);
 

@@ -5,6 +5,7 @@
 
 using System.Windows;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
 using TextBox = System.Windows.Forms.TextBox;
 
@@ -35,6 +36,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public MacdLineUi(MacdLine macd)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _macd = macd;
 
             HostColorUp.Child = new TextBox();
@@ -84,7 +87,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorMacd_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorUp.Child.BackColor;
             dialog.ShowDialog();
             HostColorUp.Child.BackColor = dialog.Color;
@@ -92,7 +95,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorSignalLine_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorDown.Child.BackColor = dialog.Color;

@@ -217,31 +217,23 @@ namespace OsEngine.Entity
                 return;
             }
 
-            if (
-                (
-                    (CandlesAll[CandlesAll.Count - 1].TimeStart.Add(TimeFrameSpan) < time)
-                    ||
-                    (TimeFrame == TimeFrame.Day 
-                     && CandlesAll[CandlesAll.Count - 1].TimeStart.Date < time.Date)
-                )
-                &&
-                CandlesAll[CandlesAll.Count - 1].State != CandleState.Finished)
+            Candle lastCandle = CandlesAll[CandlesAll.Count - 1];
+
+            if(lastCandle.State == CandleState.Finished)
+            {
+                return;
+            }
+
+            if (lastCandle.TimeStart.Add(TimeFrameSpan) < time.AddSeconds(-5))
             {
                 // пришло время закрыть свечу
-                CandlesAll[CandlesAll.Count - 1].State = CandleState.Finished;
+                lastCandle.State = CandleState.Finished;
 
                 UpdateFinishCandle();
             }
         }
 
         // сбор свечек из тиков
-
-        /// <summary>
-        /// индекс тика на последней итерации
-        /// </summary>
-        private int _lastTradeIndex;
-
-        private DateTime _lastTradeTime;
 
         /// <summary>
         /// добавить в серию новые тики
@@ -275,7 +267,7 @@ namespace OsEngine.Entity
                     return;
                 }
 
-                if (_lastTradeTime >= lastTrade.Time)
+                if (_lastTradeTime > lastTrade.Time)
                 {
                     return;
                 }
@@ -285,69 +277,11 @@ namespace OsEngine.Entity
                 return;
             }
 
-            List<Trade> newTrades = new List<Trade>();
+            List<Trade> newTrades = GetActualTrades(trades);
 
-
-            if (trades.Count > 1000)
-            { // если удаление трейдов из системы выключено
-
-                int newTradesCount = trades.Count - _lastTradeIndex;
-
-                if (newTradesCount <= 0)
-                {
-                    return;
-                }
-
-                newTrades = trades.GetRange(_lastTradeIndex, newTradesCount);
-            }
-            else
-            {
-                if (_lastTradeTime == DateTime.MinValue)
-                {
-                    newTrades = trades;
-                }
-                else
-                {
-                    for (int i = 0; i < trades.Count; i++)
-                    {
-                        try
-                        {
-                            if (trades[i] == null)
-                            {
-                                continue;
-                            }
-                            if (trades[i].Time <= _lastTradeTime)
-                            {
-                                continue;
-                            }
-                            newTrades.Add(trades[i]);
-                        }
-                        catch
-                        {
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            if(newTrades.Count == 0)
+            if(newTrades == null)
             {
                 return;
-            }
-
-            for (int i2 = 0; i2 < newTrades.Count; i2++)
-            {
-                if (newTrades[i2] == null)
-                {
-                    newTrades.RemoveAt(i2);
-                    i2--;
-                    continue;
-                }
-            }
-
-            if (newTrades != null && newTrades.Count > 0)
-            {
-                _lastTradeTime = newTrades[newTrades.Count - 1].Time;
             }
 
             // обновилось неизвесное кол-во тиков
@@ -366,22 +300,168 @@ namespace OsEngine.Entity
                     continue;
                 }
 
-                UpDateCandle(trade.Time, trade.Price, trade.Volume, true, trade.Side);
+                if(TimeFrameBuilder.CandleCreateMethodType == CandleCreateMethodType.Simple)
+                { // при классической сборке свечек. Когда мы точно знаем когда у свечи закрытие
+                    bool saveInNextCandle = true;
 
-                if (_startProgram == StartProgram.IsOsData)
+                    if (CandlesAll != null &&
+                        TimeFrameBuilder.SaveTradesInCandles &&
+                        CandlesAll[CandlesAll.Count - 1].TimeStart.Add(TimeFrameSpan) > trade.Time)
+                    {
+                        CandlesAll[CandlesAll.Count - 1].Trades.Add(trade);
+                        saveInNextCandle = false;
+                    }
+
+                    UpDateCandle(trade.Time, trade.Price, trade.Volume, true, trade.Side);
+
+                    if (TimeFrameBuilder.SaveTradesInCandles
+                        && saveInNextCandle)
+                    {
+                        CandlesAll[CandlesAll.Count - 1].Trades.Add(trade);
+                    }
+                }
+                else
+                { // при любым другом виде свечек
+
+                    UpDateCandle(trade.Time, trade.Price, trade.Volume, true, trade.Side);
+
+                    if (TimeFrameBuilder.SaveTradesInCandles)
+                    {
+                        CandlesAll[CandlesAll.Count - 1].Trades.Add(trade);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// индекс тика на последней итерации
+        /// </summary>
+        private int _lastTradeIndex;
+
+        private DateTime _lastTradeTime;
+
+        private List<Trade> GetActualTrades(List<Trade> trades)
+        {
+
+            List<Trade> newTrades = new List<Trade>();
+
+            if (trades.Count > 1000)
+            { // если удаление трейдов из системы выключено
+
+                int newTradesCount = trades.Count - _lastTradeIndex;
+
+                if (newTradesCount <= 0)
                 {
-                    continue;
+                    return null;
                 }
 
-                if (TimeFrameBuilder.SaveTradesInCandles)
+                newTrades = trades.GetRange(_lastTradeIndex, newTradesCount);
+            }
+            else
+            {
+                if (_lastTradeTime == DateTime.MinValue)
                 {
-                    List<Trade> tradesInCandle = CandlesAll[CandlesAll.Count - 1].Trades;
-                    tradesInCandle.Add(trade);
-                    CandlesAll[CandlesAll.Count - 1].Trades = tradesInCandle;
+                    newTrades = trades;
+                }
+                else
+                {
+                    bool isNewTradesFurther = false;
+
+                    for (int i = 0; i < trades.Count; i++)
+                    {
+                        try
+                        {
+                            if (trades[i] == null)
+                            {
+                                continue;
+                            }
+                            if (trades[i].Time < _lastTradeTime)
+                            {
+                                continue;
+                            }
+                            if (trades[i].Time == _lastTradeTime)
+                            {
+                                if(string.IsNullOrEmpty(trades[i].Id))
+                                {
+                                    // если IDшников нет - просто игнорируем трейды с идентичным временем
+                                    continue;
+                                }
+                                else if(isNewTradesFurther == false)
+                                {
+                                    if(IsInArrayTradeIds(trades[i].Id))
+                                    {// если IDшник в последних 100 трейдах
+                                        continue;
+                                    }
+                                    // дальше по массиву точно идут новые трейды.
+                                    // 1) они новые 2) текущий уже не лежит в старых трейдах
+                                    isNewTradesFurther = true;
+                                }
+                            }
+
+                            newTrades.Add(trades[i]);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
                 }
             }
 
             _lastTradeIndex = trades.Count;
+
+            if (newTrades.Count == 0)
+            {
+                return null;
+            }
+            
+            _lastTradeTime = newTrades[newTrades.Count - 1].Time;
+
+            for (int i2 = 0; i2 < newTrades.Count; i2++)
+            {
+                if (newTrades[i2] == null)
+                {
+                    newTrades.RemoveAt(i2);
+                    i2--;
+                }
+                if (string.IsNullOrEmpty(newTrades[i2].Id) == false)
+                {
+                    AddInListTradeIds(newTrades[i2].Id, newTrades[i2].Time);
+                } 
+            }
+
+            return newTrades;
+        }
+
+        List<string> _lastTradeIds = new List<string>();
+
+        DateTime _idsTime = DateTime.MinValue;
+
+        private void AddInListTradeIds(string id, DateTime _timeNow)
+        {
+            if(_idsTime.Second != _timeNow.Second 
+                && _idsTime < _timeNow)
+            {
+                _lastTradeIds.Clear();
+                _idsTime = _timeNow;
+            }
+
+            _lastTradeIds.Add(id);
+        }
+
+        private bool IsInArrayTradeIds(string id)
+        {
+            bool isInArray = false;
+
+            for(int i = 0;i < _lastTradeIds.Count;i++)
+            {
+                if(_lastTradeIds[i].Equals(id))
+                {
+                    return true;
+                }
+            }
+
+            return isInArray;
         }
 
         /// <summary>
@@ -918,12 +998,10 @@ namespace OsEngine.Entity
         /// </summary>
         private void UpDateSimpleTimeFrame(DateTime time, decimal price, decimal volume, bool canPushUp)
         {
-            //if (From > trade.Time)
-            //{
-            //     return;
-            // }
-
-            if (CandlesAll != null && CandlesAll.Count > 0 && CandlesAll[CandlesAll.Count - 1] != null &&
+            if (CandlesAll != null 
+                && CandlesAll.Count > 0 
+                && CandlesAll[CandlesAll.Count - 1] != null 
+                &&
                 CandlesAll[CandlesAll.Count - 1].TimeStart > time)
             {
                 // если пришли старые данные

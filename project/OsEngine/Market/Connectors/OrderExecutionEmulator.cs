@@ -9,6 +9,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using OsEngine.Entity;
+using OsEngine.Language;
+using OsEngine.Logging;
+using OsEngine.Market.Servers;
 
 namespace OsEngine.Market.Connectors
 {
@@ -36,7 +39,7 @@ namespace OsEngine.Market.Connectors
         {
             while (true)
             {
-                await Task.Delay(250);
+                await Task.Delay(250); 
 
                 if (MainWindow.ProccesIsWorked == false)
                 {
@@ -78,7 +81,7 @@ namespace OsEngine.Market.Connectors
                 order.SecurityNameCode = "TestPaper";
             }
 
-            order.PortfolioNumber = "TestPortfolio";
+            order.PortfolioNumber = "Emulator";
 
             ActivateSimple(order);
 
@@ -88,6 +91,30 @@ namespace OsEngine.Market.Connectors
             }
 
             CheckExecution(true, order);
+        }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public bool ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+            lock (_executorLocker)
+            {
+                for (int i = 0; i < ordersOnBoard.Count; i++)
+                {
+                    if (ordersOnBoard[i].NumberUser == order.NumberUser)
+                    {
+                        ordersOnBoard[i].Price = newPrice;
+                        order.Price = newPrice;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
         }
 
         /// <summary>
@@ -109,6 +136,8 @@ namespace OsEngine.Market.Connectors
             }
 
             Order newOrder = new Order();
+            newOrder.PortfolioNumber = "Emulator";
+            newOrder.ServerType = order.ServerType;
             newOrder.NumberMarket = order.NumberMarket;
             newOrder.NumberUser = order.NumberUser;
             newOrder.State = OrderStateType.Cancel;
@@ -116,7 +145,26 @@ namespace OsEngine.Market.Connectors
             newOrder.VolumeExecute = order.VolumeExecute;
             newOrder.Price = order.Price;
             newOrder.TypeOrder = order.TypeOrder;
-            newOrder.TimeCallBack = _serverTime;
+            newOrder.TimeCreate = order.TimeCreate;
+
+            if(string.IsNullOrEmpty(order.SecurityNameCode) == false 
+                && order.SecurityNameCode.EndsWith(" TestPaper") == false)
+            {
+                newOrder.SecurityNameCode = order.SecurityNameCode + " TestPaper";
+            }
+            else
+            {
+                newOrder.SecurityNameCode = order.SecurityNameCode;
+            }
+
+            if (_serverTime > newOrder.TimeCreate)
+            {
+                newOrder.TimeCallBack = _serverTime;
+            }
+            else
+            {
+                newOrder.TimeCallBack = newOrder.TimeCreate;
+            }
 
             _ordersToSend.Enqueue(newOrder);
         }
@@ -308,15 +356,37 @@ namespace OsEngine.Market.Connectors
             newOrder.Volume = order.Volume;
             newOrder.VolumeExecute = order.Volume;
             newOrder.Price = order.Price;
-            newOrder.TimeCallBack = _serverTime;
+            newOrder.TimeCreate = order.TimeCreate;
+            newOrder.TypeOrder = order.TypeOrder;
+
+            if (_serverTime > newOrder.TimeCreate)
+            {
+                newOrder.TimeCallBack = _serverTime;
+            }
+            else
+            {
+                newOrder.TimeCallBack = newOrder.TimeCreate;
+            }
+
             newOrder.Side = order.Side;
             newOrder.SecurityNameCode = order.SecurityNameCode;
+            newOrder.PortfolioNumber = "Emulator";
+            newOrder.ServerType = order.ServerType;
 
             _ordersToSend.Enqueue(newOrder);
 
             MyTrade trade = new MyTrade();
             trade.Volume = order.Volume;
-            trade.Time = _serverTime;
+
+            if (_serverTime > trade.Time)
+            {
+                trade.Time = _serverTime;
+            }
+            else
+            {
+                trade.Time = newOrder.TimeCreate;
+            }
+
             trade.Price = price;
             trade.SecurityNameCode = order.SecurityNameCode;
             trade.NumberTrade = "emu" + order.NumberMarket;
@@ -342,9 +412,22 @@ namespace OsEngine.Market.Connectors
             newOrder.Volume = order.Volume;
             newOrder.VolumeExecute = 0;
             newOrder.Price = order.Price;
-            newOrder.TimeCallBack = _serverTime;
+            newOrder.TimeCreate = order.TimeCreate;
+            newOrder.TypeOrder = order.TypeOrder;
+
+            if (_serverTime > newOrder.TimeCreate)
+            {
+                newOrder.TimeCallBack = _serverTime;
+            }
+            else
+            {
+                newOrder.TimeCallBack = newOrder.TimeCreate;
+            }
+
             newOrder.Side = order.Side;
             newOrder.SecurityNameCode = order.SecurityNameCode;
+            newOrder.PortfolioNumber = "Emulator";
+            newOrder.ServerType = order.ServerType;
 
             if (OrderChangeEvent != null)
             {
@@ -373,6 +456,11 @@ namespace OsEngine.Market.Connectors
         /// </summary>
         private DateTime _serverTime;
 
+        public void ProcessTime(DateTime time)
+        {
+            _serverTime = time;
+        }
+
         /// <summary>
         /// get new last prices
         /// провести новые последние цены
@@ -380,7 +468,7 @@ namespace OsEngine.Market.Connectors
         /// <param name="sell"> best sell price / лучшая цена продажи </param>
         /// <param name="buy"> best buy price / лучшая цена покупки </param>
         /// <param name="time"> time / время </param>
-        public void ProcessBidAsc(decimal sell, decimal buy, DateTime time)
+        public void ProcessBidAsc(decimal sell, decimal buy)
         {
             if (sell == 0 || buy == 0)
             {
@@ -397,8 +485,6 @@ namespace OsEngine.Market.Connectors
                 _bestBuy = buy;
                 _bestSell = sell;
             }
-
-            _serverTime = time;
 
             for (int i = 0; ordersOnBoard != null && i < ordersOnBoard.Count; i++)
             {

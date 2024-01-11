@@ -51,6 +51,11 @@ namespace OsEngine.Entity
         public string NameId;
 
         /// <summary>
+        /// Биржа на которой торгуется инструмент
+        /// </summary>
+        public string Exchange;
+
+        /// <summary>
         /// the trading status of this instrument on the stock exchange
         /// состояние торгов этим инструментом на бирже
         /// </summary>
@@ -278,6 +283,12 @@ namespace OsEngine.Entity
     public enum SecurityStateType
     {
         /// <summary>
+        /// we don't know if the bidding's going on
+        /// неизвестно, идут ли торги
+        /// </summary>
+        UnKnown,
+
+        /// <summary>
         /// trading on the paper is active
         /// торги по бумаге активны
         /// </summary>
@@ -287,13 +298,7 @@ namespace OsEngine.Entity
         /// paper auction is closed.
         /// торги по бумаге закрыты
         /// </summary>
-        Close,
-
-        /// <summary>
-        /// we don't know if the bidding's going on
-        /// неизвестно, идут ли торги
-        /// </summary>
-        UnKnown
+        Close
     }
 
     /// <summary>

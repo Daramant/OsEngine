@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using OsEngine.Entity;
@@ -10,6 +9,7 @@ using OsEngine.Logging;
 using OsEngine.Market.Servers.Binance.Futures.Entity;
 using OsEngine.Market.Servers.Binance.Spot.BinanceSpotEntity;
 using OsEngine.Market.Servers.Entity;
+using RestSharp;
 
 namespace OsEngine.Market.Servers.Binance.Futures
 {
@@ -182,6 +182,16 @@ namespace OsEngine.Market.Servers.Binance.Futures
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel order
         /// отозвать ордер
         /// </summary>
@@ -197,6 +207,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public void CancelAllOrders()
         {
 
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+            try
+            {
+                Dictionary<string, string> param = new Dictionary<string, string>();
+
+                param.Add("symbol=", security.Name.ToUpper());
+
+                _client.CreateQuery(Method.DELETE, "/" + _client.type_str_selector + "/v1/allOpenOrders", param, true);
+            }
+            catch (Exception exeption)
+            {
+                SendLogMessage(exeption.Message, LogMessageType.Error);
+            }
+            
         }
 
         /// <summary>
@@ -264,7 +291,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
         public List<Trade> GetTickDataToSecurity(Security security, DateTime startTime, DateTime endTime, DateTime lastDate)
         {
             endTime = endTime.AddDays(1);
-
             string markerDateTime = "";
 
             List<Trade> trades = new List<Trade>();
@@ -296,11 +322,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
                 if (markerDateTime != startOver.ToShortDateString())
                 {
+                    if (startOver >= endTime)
+                    {
+                        break;
+                    }
                     markerDateTime = startOver.ToShortDateString();
                     SendLogMessage(security.Name + " Binance Futures start loading: " + markerDateTime, LogMessageType.System);
                 }
-
-                Thread.Sleep(300);
             }
 
             if (trades.Count == 0)
@@ -458,13 +486,23 @@ namespace OsEngine.Market.Servers.Binance.Futures
                         return;
                     }
 
-                    var needDepth = _depths.Find(depth =>
-                        depth.SecurityNameCode == myDepth.stream.Split('@')[0].ToUpper());
+                    string secName = myDepth.stream.Split('@')[0].ToUpper();
+
+                    MarketDepth needDepth = null;
+
+                    for (int i = 0; i < _depths.Count; i++)
+                    {
+                        if (_depths[i].SecurityNameCode == secName)
+                        {
+                            needDepth = _depths[i];
+                            break;
+                        }
+                    }
 
                     if (needDepth == null)
                     {
                         needDepth = new MarketDepth();
-                        needDepth.SecurityNameCode = myDepth.stream.Split('@')[0].ToUpper();
+                        needDepth.SecurityNameCode = secName;
                         _depths.Add(needDepth);
                     }
 
@@ -701,6 +739,21 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     newPortf.ValueCurrent =
                         onePortf.marginBalance.ToDecimal();
 
+
+                    decimal lockedBalanceUSDT = 0m;
+                    if (onePortf.asset.Equals("USDT"))
+                    {
+                        
+                        foreach (var position in portfs.positions)
+                        {
+                            if (position.symbol == "USDTUSDT") continue;
+
+                            lockedBalanceUSDT += (position.initialMargin.ToDecimal() + position.maintMargin.ToDecimal());
+                        }
+                    }
+
+                    newPortf.ValueBlocked = lockedBalanceUSDT;
+
                     myPortfolio.SetNewPosition(newPortf);
                 }
 
@@ -740,11 +793,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         void _client_Disconnected()
         {
+            ServerStatus = ServerConnectStatus.Disconnect;
+
             if (DisconnectEvent != null)
             {
                 DisconnectEvent();
             }
-            ServerStatus = ServerConnectStatus.Disconnect;
+            
         }
 
         private List<Security> _securities;
@@ -764,6 +819,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 security.NameClass = sec.quoteAsset;
                 security.NameId = sec.symbol + sec.quoteAsset;
                 security.SecurityType = SecurityType.Futures;
+                security.Exchange = ServerType.BinanceFutures.ToString();
                 security.Lot = sec.filters[1].minQty.ToDecimal();
                 security.PriceStep = sec.filters[0].tickSize.ToDecimal();
                 security.PriceStepCost = security.PriceStep;
@@ -786,10 +842,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     sec.filters[1].minQty != null)
                 {
                     decimal minQty = sec.filters[1].minQty.ToDecimal();
+                    security.MinTradeAmount = minQty;
                     string qtyInStr = minQty.ToStringWithNoEndZero().Replace(",", ".");
-                    if (qtyInStr.Split('.').Length > 1)
+                    if (qtyInStr.Replace(",", ".").Split('.').Length > 1)
                     {
-                        security.DecimalsVolume = qtyInStr.Split('.')[1].Length;
+                        security.DecimalsVolume = qtyInStr.Replace(",",".").Split('.')[1].Length;
                     }
                 }
 
@@ -861,6 +918,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             security.Name = secName;
             security.NameFull = secName;
             security.NameClass = "FutHistory";
+            security.Exchange = ServerType.BinanceFutures.ToString();
             security.NameId = secName;
             security.SecurityType = SecurityType.Futures;
             security.Lot = sec.Lot;
@@ -878,11 +936,19 @@ namespace OsEngine.Market.Servers.Binance.Futures
             return security;
         }
 
-
+        // проверка ордеров на трейды
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+            if (_client == null)
+            {
+                return;
+            }
+            _client.ResearchTradesToOrders_Binance(orders);
+        }
 
         void _client_Connected()
         {
-
+            ServerStatus = ServerConnectStatus.Connect;
             //Выставить HedgeMode
             _client.SetPositionMode();
 
@@ -890,7 +956,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 ConnectEvent();
             }
-            ServerStatus = ServerConnectStatus.Connect;
+            
         }
 
         // outgoing messages
@@ -957,6 +1023,11 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 LogMessageEvent(message, type);
             }
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

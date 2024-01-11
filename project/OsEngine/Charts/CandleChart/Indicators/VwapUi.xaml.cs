@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OsEngine.Entity;
+using System;
 using System.Windows;
 using System.Windows.Forms;
 using MessageBox = System.Windows.MessageBox;
@@ -22,6 +23,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public VwapUi(Vwap indicator)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _indicator = indicator;
 
             UseDate.IsChecked = _indicator.UseDate;
@@ -140,7 +143,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorUp_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorUp.Child.BackColor;
             dialog.ShowDialog();
             HostColorUp.Child.BackColor = dialog.Color;
@@ -148,7 +151,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorDown_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorDown.Child.BackColor = dialog.Color;
@@ -156,7 +159,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorDayUp_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDayUp.Child.BackColor;
             dialog.ShowDialog();
             HostColorDayUp.Child.BackColor = dialog.Color;
@@ -164,7 +167,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorDayDown_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDayDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorDayDown.Child.BackColor = dialog.Color;
@@ -172,7 +175,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorWeekUp_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorWeekUp.Child.BackColor;
             dialog.ShowDialog();
             HostColorWeekUp.Child.BackColor = dialog.Color;
@@ -180,7 +183,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorWeekDown_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorWeekDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorWeekDown.Child.BackColor = dialog.Color;

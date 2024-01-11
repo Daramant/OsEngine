@@ -5,6 +5,7 @@
 
 using System.Windows;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
 
 namespace OsEngine.Charts.CandleChart.Indicators
@@ -20,6 +21,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public TickVolumeUi(TickVolume volume) // constructor//конструктор
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _volume = volume;
             ShowSettingsOnForm();
 
@@ -51,7 +54,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorUp_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorUp.Child.BackColor;
             dialog.ShowDialog();
 
@@ -60,7 +63,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
 
         private void ButtonColorDown_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDown.Child.BackColor;
             dialog.ShowDialog();
 

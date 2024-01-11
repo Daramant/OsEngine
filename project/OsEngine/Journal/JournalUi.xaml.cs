@@ -48,7 +48,6 @@ namespace OsEngine.Journal
         private List<Position> _shortPositions;
         List<BotPanelJournal> _botsJournals;
 
-
         /// <summary>
         /// constructor
         /// конструктор
@@ -58,10 +57,17 @@ namespace OsEngine.Journal
             _startProgram = startProgram;
             _botsJournals = botsJournals;
             InitializeComponent();
-            _currentCulture = CultureInfo.CurrentCulture;
+            _currentCulture = OsLocalization.CurCulture;
+
+            OsEngine.Layout.StickyBorders.Listen(this);
 
             TabBots.SizeChanged += TabBotsSizeChanged;
             TabControlPrime.SelectionChanged += TabControlPrime_SelectionChanged;
+
+            ComboBoxChartType.Items.Add("Absolute");
+            ComboBoxChartType.Items.Add("Persent");
+            ComboBoxChartType.SelectedItem = "Persent";
+            ComboBoxChartType.SelectionChanged += ComboBoxChartType_SelectionChanged;
 
             Task task = new Task(ThreadWorkerPlace);
             task.Start();
@@ -77,6 +83,8 @@ namespace OsEngine.Journal
             TabItem4.Header = OsLocalization.Journal.TabItem4;
             TabItem5.Header = OsLocalization.Journal.TabItem5;
             TabItem6.Header = OsLocalization.Journal.TabItem6;
+
+            LabelEqutyCharteType.Content = OsLocalization.Journal.Label8;
 
             CreatePositionsLists(botsJournals);
             TabControlCreateNameBots();
@@ -98,6 +106,17 @@ namespace OsEngine.Journal
 
         private void CreatePositionsLists(List<BotPanelJournal> _botsJournals)
         {
+            if (TabControlLeft == null)
+            {
+                return;
+            }
+
+            if (TabControlLeft.Dispatcher.CheckAccess() == false)
+            {
+                TabControlLeft.Dispatcher.Invoke(new Action<List<BotPanelJournal>>(CreatePositionsLists),_botsJournals);
+                return;
+            }
+
             if (TabControlLeft.SelectedItem == null)
             {
                 return;
@@ -131,53 +150,47 @@ namespace OsEngine.Journal
             {
                 return;
             }
+
             // 2 sorting deals on ALL / Long / Short
             // 2 сортируем сделки на ВСЕ / Лонг / Шорт
 
             List<Position> positionsAll = new List<Position>();
-            List<Position> positionsLong = new List<Position>();
-            List<Position> positionsShort = new List<Position>();
 
             for (int i = 0; i < myJournals.Count; i++)
             {
                 if (myJournals[i].AllPosition != null) positionsAll.AddRange(myJournals[i].AllPosition);
-                if (myJournals[i].CloseAllLongPositions != null)
-                    positionsLong.AddRange(myJournals[i].CloseAllLongPositions);
-                if (myJournals[i].CloseAllShortPositions != null)
-                    positionsShort.AddRange(myJournals[i].CloseAllShortPositions);
             }
-
-            positionsLong =
-                positionsLong.FindAll(
-                    pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
-            positionsShort =
-                positionsShort.FindAll(
-                    pos => pos.State != PositionStateType.OpeningFail && pos.State != PositionStateType.Opening);
-            // 3 sort transactions by time (this is better in a separate method)
-            // 3 сортируем сделки по времени(это лучше в отдельном методе)
-
 
             List<Position> newPositionsAll = new List<Position>();
 
             for (int i = 0; i < positionsAll.Count; i++)
             {
-                if (newPositionsAll.Count == 0 ||
-                    newPositionsAll[newPositionsAll.Count - 1].TimeCreate <= positionsAll[i].TimeCreate)
+                Position pose = positionsAll[i];
+
+                if (pose.State == PositionStateType.OpeningFail)
                 {
-                    newPositionsAll.Add(positionsAll[i]);
+                    continue;
                 }
-                else if (newPositionsAll[0].TimeCreate >= positionsAll[i].TimeCreate)
+
+                DateTime timeCreate = pose.TimeCreate;
+
+                if (newPositionsAll.Count == 0 ||
+                    newPositionsAll[newPositionsAll.Count - 1].TimeCreate <= timeCreate)
                 {
-                    newPositionsAll.Insert(0, positionsAll[i]);
+                    newPositionsAll.Add(pose);
+                }
+                else if (newPositionsAll[0].TimeCreate >= timeCreate)
+                {
+                    newPositionsAll.Insert(0, pose);
                 }
                 else
                 {
                     for (int i2 = 0; i2 < newPositionsAll.Count - 1; i2++)
                     {
-                        if (newPositionsAll[i2].TimeCreate <= positionsAll[i].TimeCreate &&
-                            newPositionsAll[i2 + 1].TimeCreate >= positionsAll[i].TimeCreate)
+                        if (newPositionsAll[i2].TimeCreate <= timeCreate &&
+                            newPositionsAll[i2 + 1].TimeCreate >= timeCreate)
                         {
-                            newPositionsAll.Insert(i2 + 1, positionsAll[i]);
+                            newPositionsAll.Insert(i2 + 1, pose);
                             break;
                         }
                     }
@@ -185,64 +198,6 @@ namespace OsEngine.Journal
             }
 
             positionsAll = newPositionsAll;
-
-            List<Position> newPositionsLong = new List<Position>();
-
-            for (int i = 0; i < positionsLong.Count; i++)
-            {
-                if (newPositionsLong.Count == 0 ||
-                    newPositionsLong[newPositionsLong.Count - 1].TimeCreate <= positionsLong[i].TimeCreate)
-                {
-                    newPositionsLong.Add(positionsLong[i]);
-                }
-                else if (newPositionsLong[0].TimeCreate > positionsLong[i].TimeCreate)
-                {
-                    newPositionsLong.Insert(0, positionsLong[i]);
-                }
-                else
-                {
-                    for (int i2 = 0; i2 < newPositionsLong.Count - 1; i2++)
-                    {
-                        if (newPositionsLong[i2].TimeCreate <= positionsLong[i].TimeCreate &&
-                            newPositionsLong[i2 + 1].TimeCreate >= positionsLong[i].TimeCreate)
-                        {
-                            newPositionsLong.Insert(i2 + 1, positionsLong[i]);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            positionsLong = newPositionsLong;
-
-            List<Position> newPositionsShort = new List<Position>();
-
-            for (int i = 0; i < positionsShort.Count; i++)
-            {
-                if (newPositionsShort.Count == 0 ||
-                    newPositionsShort[newPositionsShort.Count - 1].TimeCreate <= positionsShort[i].TimeCreate)
-                {
-                    newPositionsShort.Add(positionsShort[i]);
-                }
-                else if (newPositionsShort[0].TimeCreate > positionsShort[i].TimeCreate)
-                {
-                    newPositionsShort.Insert(0, positionsShort[i]);
-                }
-                else
-                {
-                    for (int i2 = 0; i2 < newPositionsShort.Count - 1; i2++)
-                    {
-                        if (newPositionsShort[i2].TimeCreate <= positionsShort[i].TimeCreate &&
-                            newPositionsShort[i2 + 1].TimeCreate >= positionsShort[i].TimeCreate)
-                        {
-                            newPositionsShort.Insert(i2 + 1, positionsShort[i]);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            positionsShort = newPositionsShort;
 
             _allPositions = positionsAll.FindAll(p => p.State != PositionStateType.OpeningFail);
             _longPositions = _allPositions.FindAll(p => p.Direction == Side.Buy);
@@ -373,57 +328,72 @@ namespace OsEngine.Journal
 
         private StartProgram _startProgram;
 
+        private void ComboBoxChartType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            RePaint();
+        }
+
         /// <summary>
         /// main method of repainting report tables
         /// главный метод перерисовки таблиц отчётов
         /// </summary>
         public void RePaint()
         {
+ 
             if (!TabControlLeft.CheckAccess())
             {
                 TabControlLeft.Dispatcher.Invoke(RePaint);
                 return;
             }
 
-            if(IsErase == true)
+            try
             {
-                return;
+                CreatePositionsLists(_botsJournals);
+
+                if (IsErase == true)
+                {
+                    return;
+                }
+
+                if (_allPositions == null)
+                {
+                    return;
+                }
+
+                lock (_paintLocker)
+                {
+
+                    if (TabControlPrime.SelectedIndex == 0)
+                    {
+                        PaintProfitOnChart(_allPositions);
+                    }
+                    else if (TabControlPrime.SelectedIndex == 1)
+                    {
+                        bool neadShowTickState = !(_botsJournals.Count > 1);
+
+                        PaintStatTable(_allPositions, _longPositions, _shortPositions, neadShowTickState);
+                    }
+                    else if (TabControlPrime.SelectedIndex == 2)
+                    {
+                        PaintDrowDown(_allPositions);
+                    }
+                    else if (TabControlPrime.SelectedIndex == 3)
+                    {
+                        PaintVolumeOnChart(_allPositions);
+                    }
+                    else if (TabControlPrime.SelectedIndex == 4)
+                    {
+                        PaintOpenPositionGrid(_allPositions);
+                    }
+                    else if (TabControlPrime.SelectedIndex == 5)
+                    {
+                        PaintClosePositionGrid(_allPositions);
+                    }
+                }
             }
-
-            if(_allPositions == null)
+            catch (Exception error)
             {
-                return;
-            }
-
-            lock (_paintLocker)
-            {
-
-                if (TabControlPrime.SelectedIndex == 0)
-                {
-                    PaintProfitOnChart(_allPositions);
-                }
-                else if (TabControlPrime.SelectedIndex == 1)
-                {
-                    bool neadShowTickState = !(_botsJournals.Count > 1);
-
-                    PaintStatTable(_allPositions, _longPositions, _shortPositions, neadShowTickState);
-                }
-                else if (TabControlPrime.SelectedIndex == 2)
-                {
-                    PaintDrowDown(_allPositions);
-                }
-                else if (TabControlPrime.SelectedIndex == 3)
-                {
-                    PaintVolumeOnChart(_allPositions);
-                }
-                else if (TabControlPrime.SelectedIndex == 4)
-                {
-                    PaintOpenPositionGrid(_allPositions);
-                }
-                else if (TabControlPrime.SelectedIndex == 5)
-                {
-                    PaintClosePositionGrid(_allPositions);
-                }
+                System.Windows.MessageBox.Show(error.ToString());
             }
         }
 
@@ -542,7 +512,6 @@ namespace OsEngine.Journal
         private void TabBotsSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             ReloadTabs();
-            CreatePositionsLists(_botsJournals);
             RePaint();
         }
 
@@ -652,7 +621,7 @@ namespace OsEngine.Journal
                 column0.CellTemplate = cell0;
                 column0.HeaderText = @"";
                 column0.ReadOnly = true;
-                column0.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                column0.Width = 200;
 
                 _gridStatistics.Columns.Add(column0);
 
@@ -678,7 +647,7 @@ namespace OsEngine.Journal
                 column3.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
                 _gridStatistics.Columns.Add(column3);
 
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows.Add(); //string addition/ добавление строки
                 }
@@ -687,33 +656,35 @@ namespace OsEngine.Journal
                 _gridStatistics.Rows[1].Cells[0].Value = OsLocalization.Journal.GridRow2;
                 _gridStatistics.Rows[2].Cells[0].Value = OsLocalization.Journal.GridRow3;
                 _gridStatistics.Rows[3].Cells[0].Value = OsLocalization.Journal.GridRow17;
-                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow4;
-                _gridStatistics.Rows[5].Cells[0].Value = OsLocalization.Journal.GridRow5;
+                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow18;
 
-                _gridStatistics.Rows[7].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[10].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[5].Cells[0].Value = OsLocalization.Journal.GridRow4;
+                _gridStatistics.Rows[6].Cells[0].Value = OsLocalization.Journal.GridRow5;
+
+                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[10].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[11].Cells[0].Value = OsLocalization.Journal.GridRow9;
 
 
-                _gridStatistics.Rows[12].Cells[0].Value = OsLocalization.Journal.GridRow10;
-                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow11;
-                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[18].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow10;
+                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow11;
+                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[18].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[19].Cells[0].Value = OsLocalization.Journal.GridRow12;
 
-                _gridStatistics.Rows[20].Cells[0].Value = OsLocalization.Journal.GridRow13;
-                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow14;
-                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[26].Cells[0].Value = OsLocalization.Journal.GridRow12;
-                _gridStatistics.Rows[27].Cells[0].Value = "";
-                _gridStatistics.Rows[28].Cells[0].Value = OsLocalization.Journal.GridRow15;
-                _gridStatistics.Rows[29].Cells[0].Value = OsLocalization.Journal.GridRow16;
+                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow13;
+                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow14;
+                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[26].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[27].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[28].Cells[0].Value = "";
+                _gridStatistics.Rows[29].Cells[0].Value = OsLocalization.Journal.GridRow15;
+                _gridStatistics.Rows[30].Cells[0].Value = OsLocalization.Journal.GridRow16;
             }
             catch (Exception error)
             {
@@ -738,42 +709,42 @@ namespace OsEngine.Journal
 
             if (positionsAllState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = "";
                 }
             }
             if (positionsLongState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = "";
                 }
             }
             if (positionsShortState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = "";
                 }
             }
             if (positionsLongState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = positionsLongState[i].ToString();
                 }
             }
             if (positionsShortState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = positionsShortState[i].ToString();
                 }
             }
             if (positionsAllState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = positionsAllState[i].ToString();
                 }
@@ -902,40 +873,59 @@ namespace OsEngine.Journal
             nullLine.ChartArea = "ChartAreaProfit";
             nullLine.ShadowOffset = 0;
 
-
-
             try
             {
-                /*
-
-                */
 
                 decimal profitSum = 0;
                 decimal profitSumLong = 0;
                 decimal profitSumShort = 0;
                 decimal maxYVal = 0;
                 decimal minYval = decimal.MaxValue;
-                //Side d = new Side();
+                decimal curProfit = 0;
+                decimal maxYValBars = 0;
+                decimal minYValBars = decimal.MaxValue;
+
+                string chartType = ComboBoxChartType.SelectedItem.ToString();
 
                 for (int i = 0; i < positionsAll.Count; i++)
                 {
-                    profitSum += positionsAll[i].ProfitPortfolioPunkt;
+
+                    if (chartType == "Absolute")
+                    {
+                        curProfit = positionsAll[i].ProfitPortfolioPunkt;
+                    }
+                    else if (chartType == "Persent")
+                    {
+                        curProfit = positionsAll[i].ProfitOperationPersent;
+                    }
+
+                    profitSum += curProfit;
+
                     profit.Points.AddXY(i, profitSum);
 
 
                     profit.Points[profit.Points.Count - 1].AxisLabel =
                         positionsAll[i].TimeCreate.ToString(_currentCulture);
 
-                    profitBar.Points.AddXY(i, positionsAll[i].ProfitPortfolioPunkt);
+                    profitBar.Points.AddXY(i, curProfit);
+
+                    if(curProfit > maxYValBars)
+                    {
+                        maxYValBars = curProfit;
+                    }
+                    if (curProfit < minYValBars)
+                    {
+                        minYValBars = curProfit;
+                    }
 
                     if (positionsAll[i].Direction == Side.Buy)
                     {
-                        profitSumLong += positionsAll[i].ProfitPortfolioPunkt;
+                        profitSumLong += curProfit;
                     }
 
                     if (positionsAll[i].Direction == Side.Sell)
                     {
-                        profitSumShort += positionsAll[i].ProfitPortfolioPunkt;
+                        profitSumShort += curProfit;
                     }
 
                     if (profitSum > maxYVal)
@@ -964,10 +954,12 @@ namespace OsEngine.Journal
                         minYval = profitSumShort;
                     }
 
+
+
                     profitLong.Points.AddXY(i, profitSumLong);
                     profitShort.Points.AddXY(i, profitSumShort);
 
-                    if (positionsAll[i].ProfitPortfolioPunkt > 0)
+                    if (curProfit > 0)
                     {
                         profitBar.Points[profitBar.Points.Count - 1].Color = Color.Gainsboro;
                     }
@@ -999,6 +991,21 @@ namespace OsEngine.Journal
                     _chartEquity.ChartAreas[0].AxisY2.Maximum = (double)maxYVal;
                     _chartEquity.ChartAreas[0].AxisY2.Minimum = (double)minYval;
                 }
+
+                if (maxYValBars != 0 &&
+                    minYValBars != decimal.MaxValue &&
+                    maxYValBars != minYValBars)
+                {
+                    decimal chartHeigh = maxYValBars - minYValBars;
+
+                    maxYValBars = maxYValBars + chartHeigh * 0.05m;
+                    minYValBars = minYValBars - chartHeigh * 0.05m;
+
+                    _chartEquity.ChartAreas[1].AxisY2.Maximum = (double)maxYValBars;
+                    _chartEquity.ChartAreas[1].AxisY2.Minimum = (double)minYValBars;
+
+                }
+
             }
             catch (Exception error)
             {
@@ -1057,7 +1064,7 @@ namespace OsEngine.Journal
                 _chartEquity.Series[i].Points[index].LabelBackColor = Color.FromArgb(17, 18, 23);
             }
         }
-        // volume drawing
+
         // прорисовка объёма
 
         /// <summary>
@@ -1518,22 +1525,50 @@ namespace OsEngine.Journal
             // дд в %
 
             List<decimal> ddPepcent = new decimal[positionsAll.Count].ToList();
-            lastMax = 0;
-            currentProfit = 0;
+
+            decimal firsValue = positionsAll[0].PortfolioValueOnOpenPosition;
 
             for (int i = 0; i < positionsAll.Count; i++)
             {
-                currentProfit += positionsAll[i].ProfitPortfolioPersent;
-
-                if (lastMax < currentProfit)
+                if (firsValue != 0)
                 {
-                    lastMax = currentProfit;
+                    break;
+                }
+                firsValue = positionsAll[i].PortfolioValueOnOpenPosition;
+            }
+
+            if (firsValue == 0)
+            {
+                firsValue = 1;
+            }
+
+            decimal thisSumm = firsValue;
+            decimal thisPik = firsValue;
+
+            for (int i = 0; i < positionsAll.Count; i++)
+            {
+                thisSumm += positionsAll[i].ProfitPortfolioPunkt * (positionsAll[i].MultToJournal / 100);
+
+                if (thisSumm > thisPik)
+                {
+                    thisPik = thisSumm;
                 }
 
-                if (currentProfit - lastMax < 0)
+                decimal thisDown = 0;
+
+                if (thisSumm < 0)
                 {
-                    ddPepcent[i] = Math.Round(currentProfit - lastMax,4);
+                    // уже ушли ниже нулевой отметки по счёту
+
+                    thisDown = -thisPik + thisSumm;
                 }
+                else if (thisSumm > 0)
+                {
+                    // выше нулевой отметки по счёту
+                    thisDown = -(thisPik - thisSumm);
+                }
+
+                ddPepcent[i] = (thisDown / (thisPik / 100));
             }
 
             Series drowDownPersent = new Series("SeriesDdPercent");
@@ -1671,10 +1706,18 @@ namespace OsEngine.Journal
                 nRow.Cells[0].Value = position.Number;
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[1].Value = position.TimeCreate;
+                nRow.Cells[1].Value = position.TimeCreate.ToString(_currentCulture);
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[2].Value = position.TimeClose;
+
+                if (position.TimeClose != position.TimeOpen)
+                {
+                    nRow.Cells[2].Value = position.TimeClose.ToString(_currentCulture);
+                }
+                else
+                {
+                    nRow.Cells[2].Value = "";
+                }
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
                 nRow.Cells[3].Value = position.NameBot;

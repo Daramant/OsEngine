@@ -81,6 +81,11 @@ namespace OsEngine.Market.Servers.MFD
 
         }
 
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
         public void CancelOrder(Order order)
         {
 
@@ -583,5 +588,19 @@ namespace OsEngine.Market.Servers.MFD
             }
         }
 
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

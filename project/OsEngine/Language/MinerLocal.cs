@@ -63,8 +63,8 @@ namespace OsEngine.Language
             "Ru:Редактировать_");
 
         public string Label1 => OsLocalization.ConvertToLocString(
-            "Eng:Set of patterns #_" +
-            "Ru:Набор паттернов #_");
+            "Eng:Set of patterns _" +
+            "Ru:Набор паттернов _");
 
         public string Label2 => OsLocalization.ConvertToLocString(
             "Eng:Set name cannot be empty_" +
@@ -353,5 +353,13 @@ namespace OsEngine.Language
         public string Label74 => OsLocalization.ConvertToLocString(
             "Eng:Type_" +
             "Ru:Тип_");
+
+        public string Label75 => OsLocalization.ConvertToLocString(
+            "Eng:Launching the data set_" +
+            "Ru:Запускаем сет данных_");
+
+        public string Label76 => OsLocalization.ConvertToLocString(
+            "Eng:Are you sure you want to close the application?_" +
+            "Ru:Вы уверены что хотите закрыть приложение?_");
     }
 }

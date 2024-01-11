@@ -96,6 +96,11 @@ namespace OsEngine.Market.Servers.NinjaTrader
             _client.ExecuteOrder(order);
         }
 
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
         public void CancelOrder(Order order)
         {
             _client.CancelOrder(order);
@@ -271,8 +276,23 @@ namespace OsEngine.Market.Servers.NinjaTrader
             }
         }
 
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+           
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
-		/// outgoing log message
+        /// outgoing log message
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;

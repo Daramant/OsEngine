@@ -33,7 +33,7 @@ namespace OsEngine
     /// </summary>
     public partial class MainWindow
     {
-        
+
         private static MainWindow _window;
 
         public static Dispatcher GetDispatcher
@@ -55,6 +55,11 @@ namespace OsEngine
             InitializeComponent();
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
+            ImageAlor2.Visibility = Visibility.Collapsed;
+            ImageAlor.Visibility = Visibility.Collapsed;
+
+            this.Closed += MainWindow_Closed;
+
             try
             {
                 int winVersion = Environment.OSVersion.Version.Major;
@@ -71,6 +76,12 @@ namespace OsEngine
                 if (!CheckWorkWithDirectory())
                 {
                     MessageBox.Show(OsLocalization.MainWindow.Message2);
+                    Close();
+                }
+
+                if(!CheckOutSomeLibrariesNearby())
+                {
+                    MessageBox.Show(OsLocalization.MainWindow.Message6);
                     Close();
                 }
             }
@@ -92,7 +103,7 @@ namespace OsEngine
 
             ChangeText();
             OsLocalization.LocalizationTypeChangeEvent += ChangeText;
-            
+
             CommandLineInterfaceProcess();
 
             Task.Run(ClearOptimizerWorkResults);
@@ -102,13 +113,39 @@ namespace OsEngine
 
             GlobalGUILayout.Listen(this, "mainWindow");
 
-            this.Closed += MainWindow_Closed;
+            ImageAlor.MouseEnter += ImageAlor_MouseEnter;
+            ImageAlor2.MouseLeave += ImageAlor_MouseLeave;
+            ImageAlor2.MouseDown += ImageAlor2_MouseDown;
+        }
+
+        private void ImageAlor2_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo("https://www.alorbroker.ru/open?pr=L0745") { UseShellExecute = true });
+        }
+
+        private void ImageAlor_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                ImageAlor2.Visibility = Visibility.Collapsed;
+                ImageAlor.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ImageAlor_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                ImageAlor2.Visibility = Visibility.Visible;
+                ImageAlor.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             ProccesIsWorked = false;
             GlobalGUILayout.IsClosed = true;
+            Process.GetCurrentProcess().Kill();
         }
 
         private void ChangeText()
@@ -128,6 +165,18 @@ namespace OsEngine
 
             ButtonTesterLight.Content = OsLocalization.MainWindow.OsTesterLightName;
             ButtonRobotLight.Content = OsLocalization.MainWindow.OsBotStationLightName;
+
+            if(OsLocalization.CurLocalization == OsLocalization.OsLocalType.Ru)
+            {
+                this.Height = 415;
+                ImageAlor.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                this.Height = 315;
+                ImageAlor.Visibility = Visibility.Collapsed;
+                ImageAlor2.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
@@ -171,6 +220,18 @@ namespace OsEngine
             }
         }
 
+        private bool CheckOutSomeLibrariesNearby()
+        {
+            // проверяем чтобы пользователь не запустился с рабочего стола, но не ярлыком, а экзешником
+
+            if(File.Exists("QuikSharp.dll") == false)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// check the permission of the program to create files in the directory
         /// проверяем разрешение программы создавать файлы в директории
@@ -210,7 +271,36 @@ namespace OsEngine
         {
             string message = OsLocalization.MainWindow.Message5 + e.ExceptionObject;
 
-            MessageBox.Show(message);
+            if (PrimeSettingsMaster.RebootTradeUiLigth == true &&
+                RobotUiLight.IsRobotUiLightStart)
+            {
+                Reboot(message);
+            }
+            else
+            {
+                MessageBox.Show(message);
+            }
+        }
+
+        private void Reboot(string message)
+        {
+
+            if (!CheckAccess())
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    Reboot(message);
+                });
+                return;
+            }
+
+            App.app.Shutdown();
+            Process process = new Process();
+            process.StartInfo.FileName = Directory.GetCurrentDirectory() + "\\OsEngine.exe";
+            process.StartInfo.Arguments = " -error " + message;
+            process.Start();
+
+            Process.GetCurrentProcess().Kill();
         }
 
         private void ButtonTesterCandleOne_Click(object sender, RoutedEventArgs e)
@@ -389,7 +479,7 @@ namespace OsEngine
                 return;
             }
 
-            ImageGear.RenderTransform = new RotateTransform(angle,12,12);
+            ImageGear.RenderTransform = new RotateTransform(angle, 12, 12);
 
         }
 
@@ -426,7 +516,7 @@ namespace OsEngine
             }
             Process.GetCurrentProcess().Kill();
         }
-        
+
         private void CommandLineInterfaceProcess()
         {
             string[] args = Environment.GetCommandLineArgs();
@@ -440,6 +530,28 @@ namespace OsEngine
             }
             else if (Array.Exists(args, a => a.Equals("-robotslight")))
             {
+                ButtonRobotLight_Click(this, default);
+            }
+            else if (Array.Exists(args, a => a.Equals("-error")) && PrimeSettingsMaster.RebootTradeUiLigth)
+            {
+
+                CriticalErrorHandler.ErrorInStartUp = true;
+
+                Array.ForEach(args, (a) => { CriticalErrorHandler.ErrorMessage += a; });
+
+                new Task(() =>
+                {
+                    string messageError = String.Empty;
+
+                    for (int i = 0; i < args.Length; i++)
+                    {
+                        messageError += args[i];
+                    }
+
+                    MessageBox.Show(messageError);
+
+                }).Start();
+
                 ButtonRobotLight_Click(this, default);
             }
         }
@@ -477,4 +589,12 @@ namespace OsEngine
             }
         }
     }
+
+    public static class CriticalErrorHandler
+    {
+        public static string ErrorMessage = String.Empty;
+
+        public static bool ErrorInStartUp = false;
+    }
+
 }

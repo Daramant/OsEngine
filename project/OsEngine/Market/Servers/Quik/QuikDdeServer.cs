@@ -25,15 +25,6 @@ namespace OsEngine.Market.Servers.Quik
             CreateParameterPath(OsLocalization.Market.Message82);
             CreateParameterEnum("Number separator", "Dot", new List<string>(){"Dot","Comma"});
         }
-
-        /// <summary>
-        /// override method that gives the server state
-        /// переопределяем метод отдающий состояние сервера
-        /// </summary>
-        public override bool IsTimeToServerWork
-        {
-            get { return ((QuikDdeServerRealization)ServerRealization).ServerInWork; }
-        }
     }
 
     /// <summary>
@@ -643,6 +634,16 @@ namespace OsEngine.Market.Servers.Quik
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel order
         /// отозвать ордер
         /// </summary>
@@ -1168,6 +1169,21 @@ namespace OsEngine.Market.Servers.Quik
             {
                 LogMessageEvent(message, type);
             }
+        }
+
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

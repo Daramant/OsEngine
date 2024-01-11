@@ -66,7 +66,7 @@ namespace OsEngine.PrimeSettings
 
         private static bool _transactionBeepIsActiv;
 
-        public static bool ServerTestingIsActive
+        public static bool RebootTradeUiLigth
         {
             get
             {
@@ -74,16 +74,16 @@ namespace OsEngine.PrimeSettings
                 {
                     Load();
                 }
-                return _serverTestingIsActiv;
+                return _rebootTradeUiLigth;
             }
             set
             {
-                _serverTestingIsActiv = value;
+                _rebootTradeUiLigth = value;
                 Save();
             }
         }
 
-        private static bool _serverTestingIsActiv;
+        private static bool _rebootTradeUiLigth;
 
         public static bool AutoStartApi
         {
@@ -193,12 +193,12 @@ namespace OsEngine.PrimeSettings
                     writer.WriteLine(_transactionBeepIsActiv);
                     writer.WriteLine(_errorLogBeepIsActiv);
                     writer.WriteLine(_errorLogMessageBoxIsActiv);
-                    writer.WriteLine(_serverTestingIsActiv);
                     writer.WriteLine(_autoStartApi);
                     writer.WriteLine(_token);
                     writer.WriteLine(_ip);
                     writer.WriteLine(_port);
                     writer.WriteLine(_labelInHeaderBotStation);
+                    writer.WriteLine(_rebootTradeUiLigth);
 
                     writer.Close();
                 }
@@ -229,12 +229,12 @@ namespace OsEngine.PrimeSettings
                     _transactionBeepIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _errorLogBeepIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _errorLogMessageBoxIsActiv = Convert.ToBoolean(reader.ReadLine());
-                    _serverTestingIsActiv = Convert.ToBoolean(reader.ReadLine());
                     _autoStartApi = Convert.ToBoolean(reader.ReadLine());
                     _token = reader.ReadLine();
                     _ip = reader.ReadLine();
                     _port = reader.ReadLine();
                     _labelInHeaderBotStation = reader.ReadLine();
+                    _rebootTradeUiLigth = Convert.ToBoolean(reader.ReadLine());
 
                     reader.Close();
                 }

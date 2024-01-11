@@ -20,6 +20,8 @@ namespace OsEngine.Alerts
         public AlertToPriceCreateUi(AlertToPrice alert)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             MyAlert = alert;
 
             CheckBoxOnOff.IsChecked = MyAlert.IsOn;
@@ -35,7 +37,6 @@ namespace OsEngine.Alerts
             ComboBoxSignalType.Items.Add(SignalType.Sell);
             ComboBoxSignalType.Items.Add(SignalType.CloseAll);
             ComboBoxSignalType.Items.Add(SignalType.CloseOne);
-            ComboBoxSignalType.Items.Add(SignalType.Modificate);
             ComboBoxSignalType.Items.Add(SignalType.OpenNew);
             ComboBoxSignalType.Items.Add(SignalType.ReloadProfit);
             ComboBoxSignalType.Items.Add(SignalType.ReloadStop);
@@ -44,6 +45,11 @@ namespace OsEngine.Alerts
             ComboBoxOrderType.Items.Add(OrderPriceType.Limit);
             ComboBoxOrderType.Items.Add(OrderPriceType.Market);
             ComboBoxOrderType.SelectedItem = MyAlert.OrderPriceType;
+
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.Persent.ToString());
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.PriceStep.ToString());
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.Absolute.ToString());
+            ComboBoxSlippageType.SelectedItem = MyAlert.SlippageType.ToString();
 
             TextBoxVolumeReaction.Text = MyAlert.VolumeReaction.ToString();
             TextBoxSlippage.Text = MyAlert.Slippage.ToString(new CultureInfo("RU-ru"));
@@ -83,6 +89,8 @@ namespace OsEngine.Alerts
             CheckBoxMusicAlert.Content = OsLocalization.Alerts.Label10;
             CheckBoxWindow.Content = OsLocalization.Alerts.Label16;
             ButtonSave.Content = OsLocalization.Alerts.Label17;
+            LabelSlippageType.Content = OsLocalization.Alerts.Label19;
+            LabelActivationPrice.Content = OsLocalization.Alerts.Label20;
         }
 
         void LabelOsa_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -113,6 +121,8 @@ namespace OsEngine.Alerts
             MyAlert.Slippage = TextBoxSlippage.Text.ToDecimal();
 
             MyAlert.NumberClosePosition = Convert.ToInt32(TextBoxClosePosition.Text);
+
+            Enum.TryParse(ComboBoxSlippageType.SelectedItem.ToString(), true, out MyAlert.SlippageType);
 
             if (CheckBoxWindow.IsChecked.HasValue)
             {

@@ -346,24 +346,41 @@ namespace OsEngine.Market.Servers.Tester
             SendLogMessage(OsLocalization.Market.Message35, LogMessageType.System);
 
 
-            if (_candleSeriesTesterActivate != null)
+            if(_isFirstStart == false)
             {
-                for (int i = 0; i < _candleSeriesTesterActivate.Count; i++)
+                if (_candleSeriesTesterActivate != null)
                 {
-                    _candleSeriesTesterActivate[i].Clear();
+                    for (int i = 0; i < _candleSeriesTesterActivate.Count; i++)
+                    {
+                        _candleSeriesTesterActivate[i].Clear();
+                    }
                 }
+
+                _candleSeriesTesterActivate = new List<SecurityTester>();
+
+                int countSeriesInLastTest = _candleManager.ActiveSeriesCount;
+
+                _candleManager.Clear();
+
+                if (NeadToReconnectEvent != null)
+                {
+                    NeadToReconnectEvent();
+                }
+
+                int timeToWaitConnect = 100 + countSeriesInLastTest * 40;
+
+                if (timeToWaitConnect > 10000)
+                {
+                    timeToWaitConnect = 10000;
+                }
+
+                if(timeToWaitConnect < 1000)
+                {
+                    timeToWaitConnect = 1000;
+                }
+
+                Thread.Sleep(timeToWaitConnect);
             }
-
-            _candleSeriesTesterActivate = new List<SecurityTester>();
-
-            if (NeadToReconnectEvent != null)
-            {
-                NeadToReconnectEvent();
-            }
-
-            Thread.Sleep(200);
-
-            _candleManager.Clear();
 
             _allTrades = null;
 
@@ -377,7 +394,7 @@ namespace OsEngine.Market.Servers.Tester
 
             while (TimeNow.Minute != 0)
             {
-               TimeNow = TimeNow.AddMinutes(-1);
+                TimeNow = TimeNow.AddMinutes(-1);
             }
 
             while (TimeNow.Second != 0)
@@ -404,13 +421,18 @@ namespace OsEngine.Market.Servers.Tester
 
             OrdersActiv.Clear();
 
+            Thread.Sleep(2000);
+
             TesterRegime = TesterRegime.Play;
 
             if (TestingStartEvent != null)
             {
                 TestingStartEvent();
             }
+            _isFirstStart = false;
         }
+
+        private bool _isFirstStart = true;
 
         public bool IsAlreadyStarted;
 
@@ -817,6 +839,30 @@ namespace OsEngine.Market.Servers.Tester
                     if (currentTabs[i2].Securiti != null)
                     {
                         namesSecurity.Add(currentTabs[i2].Securiti.Name);
+                    }
+                }
+            }
+
+            for (int i = 0; i < bots.Count; i++)
+            {
+                List<BotTabPair> currentTabs = bots[i].TabsPair;
+
+                for (int i2 = 0; currentTabs != null && i2 < currentTabs.Count; i2++)
+                {
+                    List<PairToTrade> pairs = currentTabs[i2].Pairs;
+
+                    for(int i3 = 0; i3 < pairs.Count;i3++)
+                    {
+                        PairToTrade pair = pairs[i3];
+
+                        if(pair.Tab1.Securiti != null)
+                        {
+                            namesSecurity.Add(pair.Tab1.Securiti.Name);
+                        }
+                        if (pair.Tab2.Securiti != null)
+                        {
+                            namesSecurity.Add(pair.Tab2.Securiti.Name);
+                        }
                     }
                 }
             }
@@ -1458,6 +1504,7 @@ namespace OsEngine.Market.Servers.Tester
             // проверяем в файле тестера данные о наличии мультипликаторов и ГО для бумаг
 
             SetToSecuritiesDopSettings();
+            LoadSecurityTestSettings();
 
             if (TestingNewSecurityEvent != null)
             {
@@ -2081,6 +2128,11 @@ namespace OsEngine.Market.Servers.Tester
                 { // test with using ticks / прогон на тиках
                     List<Trade> trades = security.LastTradeSeries;
 
+                    if(order.Price == 0)
+                    {
+                        order.Price = trades[0].Price;
+                    }
+
                     for (int indexTrades = 0; trades != null && indexTrades < trades.Count; indexTrades++)
                     {
                         if (CheckOrdersInTickTest(order, trades[indexTrades],false))
@@ -2093,6 +2145,13 @@ namespace OsEngine.Market.Servers.Tester
                 else if(security.DataType == SecurityTesterDataType.Candle)
                 { // test with using candles / прогон на свечках
                     Candle lastCandle = security.LastCandle;
+
+                    if (order.Price == 0)
+                    {
+                        order.Price = lastCandle.Open;
+                    }
+
+
                     if (CheckOrdersInCandleTest(order, lastCandle))
                     {
                         i--;
@@ -3262,19 +3321,19 @@ namespace OsEngine.Market.Servers.Tester
 		/// start data downloading on instrument 
         /// Начать выгрузку данных по инструменту
         /// </summary>
-        public CandleSeries GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
+        public List<Candle> GetCandleDataToSecurity(string securityName, string securityClass, TimeFrameBuilder timeFrameBuilder,
             DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdate)
         {
-            return StartThisSecurity(securityName, timeFrameBuilder,securityClass);
+            return null;
         }
 
         /// <summary>
 		/// take ticks data on instrument for period
         /// взять тиковые данные по инструменту за определённый период
         /// </summary>
-        public bool GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
+        public List<Trade> GetTickDataToSecurity(string securityName, string securityClass, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
-            return true;
+            return null;
         }
 
         private TimeSpan GetTimeFremeInSpan(TimeFrame frame)
@@ -3574,17 +3633,22 @@ namespace OsEngine.Market.Servers.Tester
                 }
             }
 
-            for (int i = 0; i < _allTrades.Length; i++)
+            if(_typeTesterData != TesterDataType.TickAllCandleState &&
+                _typeTesterData != TesterDataType.TickOnlyReadyCandle)
             {
-                List<Trade> curTrades = _allTrades[i];
-
-                if (curTrades != null &&
-                    curTrades.Count > 100)
+                for (int i = 0; i < _allTrades.Length; i++)
                 {
-                    curTrades = curTrades.GetRange(curTrades.Count - 101, 100);
-                    _allTrades[i] = curTrades;
+                    List<Trade> curTrades = _allTrades[i];
+
+                    if (curTrades != null &&
+                        curTrades.Count > 100)
+                    {
+                        curTrades = curTrades.GetRange(curTrades.Count - 101, 100);
+                        _allTrades[i] = curTrades;
+                    }
                 }
             }
+
 
             ServerTime = tradesNew[tradesNew.Count - 1].Time;
 
@@ -3689,7 +3753,6 @@ namespace OsEngine.Market.Servers.Tester
         /// </summary>
         private int _iteratorNumbersMyTrades;
 
-
         /// <summary>
 		/// place order to the exchange
         /// выставить ордер на биржу
@@ -3719,7 +3782,8 @@ namespace OsEngine.Market.Servers.Tester
                 return;
             }
 
-            if (order.Price <= 0)
+            if (order.Price <= 0
+                && order.TypeOrder != OrderPriceType.Market)
             {
                 SendLogMessage(OsLocalization.Market.Message41 + order.Price, LogMessageType.Error);
                 FailedOperationOrder(order);
@@ -3755,6 +3819,7 @@ namespace OsEngine.Market.Servers.Tester
             orderOnBoard.SecurityNameCode = order.SecurityNameCode;
             orderOnBoard.Side = order.Side;
             orderOnBoard.State = OrderStateType.Activ;
+            orderOnBoard.ServerType = order.ServerType;
             orderOnBoard.TimeCallBack = ServerTime;
             orderOnBoard.TimeCreate = ServerTime;
             orderOnBoard.TypeOrder = order.TypeOrder;
@@ -3804,6 +3869,17 @@ namespace OsEngine.Market.Servers.Tester
                 }
             }
         }
+
+        /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
 
         /// <summary>
 		/// cancel order from the exchange
@@ -3901,6 +3977,7 @@ namespace OsEngine.Market.Servers.Tester
             orderOnBoard.TypeOrder = order.TypeOrder;
             orderOnBoard.Volume = order.Volume;
             orderOnBoard.Comment = order.Comment;
+            orderOnBoard.ServerType = order.ServerType;
 
             if (NewOrderIncomeEvent != null)
             {
@@ -3994,8 +4071,13 @@ namespace OsEngine.Market.Servers.Tester
             }
         }
 
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
-		/// log manager
+        /// log manager
         /// лог менеджер
         /// </summary>
         /// 
@@ -4146,6 +4228,12 @@ namespace OsEngine.Market.Servers.Tester
                 now < TimeStart)
             {
                 return;
+            }
+
+            if(now.Month == 4 &&
+                now.Day > 4)
+            {
+
             }
 
             if (LastTrade != null &&

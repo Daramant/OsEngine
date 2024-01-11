@@ -18,6 +18,8 @@ namespace OsEngine.Robots.Patterns
         public ThreeSoldierUi(ThreeSoldier strategy)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _strategy = strategy;
 
             ComboBoxRegime.Items.Add(BotTradeRegime.Off);

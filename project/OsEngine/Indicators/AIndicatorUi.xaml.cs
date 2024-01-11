@@ -17,6 +17,8 @@ namespace OsEngine.Indicators
         public AIndicatorUi(Aindicator indicator)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             Title = indicator.GetType().Name + " " + OsLocalization.Charts.Label1;
             _indicator = indicator;
 
@@ -274,7 +276,7 @@ namespace OsEngine.Indicators
 
                 if (cellIndex == 1)
                 {
-                    ColorDialog dialog = new ColorDialog();
+                    ColorCustomDialog dialog = new ColorCustomDialog();
                     dialog.Color = _gridVisual.Rows[rowIndex].Cells[1].Style.ForeColor;
                     dialog.ShowDialog();
 

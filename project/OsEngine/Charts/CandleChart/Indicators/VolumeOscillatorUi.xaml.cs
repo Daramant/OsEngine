@@ -6,6 +6,7 @@
 using System;
 using System.Windows;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
 using MessageBox = System.Windows.MessageBox;
 using TextBox = System.Windows.Forms.TextBox;
@@ -38,6 +39,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public VolumeOscillatorUi(VolumeOscillator mA)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _mA = mA;
 
             TextBoxLenght1.Text = _mA.Lenght1.ToString();
@@ -94,7 +97,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColor_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColor.Child.BackColor;
             dialog.ShowDialog();
 

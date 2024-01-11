@@ -211,6 +211,16 @@ namespace OsEngine.Market.Servers.Hitbtc
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel orders from the trading system
         /// отозвать ордер из торговой системы
         /// </summary>
@@ -270,7 +280,6 @@ namespace OsEngine.Market.Servers.Hitbtc
                 {
                     NumberOrderParent = result.clientOrderId,
                     Side = result.side == "sell" ? Side.Sell : Side.Buy,
-                    NumberPosition = Convert.ToString(needCoupler.OsOrderNumberUser),
                     SecurityNameCode = result.symbol,
                     Price =
                         result.price.ToDecimal()
@@ -812,12 +821,27 @@ namespace OsEngine.Market.Servers.Hitbtc
             }
         }
 
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+
+        }
+
         /// <summary>
         /// outgoing lom message
         /// исходящее сообщение для лога
         /// </summary>
         public event Action<string, LogMessageType> LogMessageEvent;
         #endregion
+
+        public void CancelAllOrdersToSecurity(Security security)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
+        }
 
         internal class OrderCoupler
         {

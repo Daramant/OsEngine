@@ -25,26 +25,36 @@ namespace OsEngine.OsOptimizer
         public OptimizerReportUi(OptimizerMaster master)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
             _master = master;
 
             _resultsCharting = new OptimizerReportCharting(
-            WindowsFormsHostDependences, WindowsFormsHostColumnsResults,
-            WindowsFormsHostPieResults, ComboBoxSortDependencesResults,
-            WindowsFormsHostOutOfSampleEquity, LabelTotalProfitInOutOfSample);
+            HostStepsOfOptimizationTable,
+            HostRobustness,
+            ComboBoxSortResultsType,
+            LabelRobustnessMetricValue);
+
+            _resultsCharting.ActivateTotalProfitChart(HostTotalProfit, ComboBoxTotalProfit);
+
+            _resultsCharting.ActivateAverageProfitChart(HostAverageProfit);
+            _resultsCharting.ActivateProfitFactorChart(HostProfitFactor);
 
             _resultsCharting.LogMessageEvent += _master.SendLogMessage;
+
             CreateTableFazes();
             CreateTableResults();
-
 
             LabelSortBy.Content = OsLocalization.Optimizer.Label39;
             LabelOptimSeries.Content = OsLocalization.Optimizer.Label30;
             LabelTableResults.Content = OsLocalization.Optimizer.Label31;
             TabControlResultsSeries.Header = OsLocalization.Optimizer.Label37;
             TabControlResultsOutOfSampleResults.Header = OsLocalization.Optimizer.Label38;
-            LabelTotalProfitInOutOfSample.Content = OsLocalization.Optimizer.Label43;
             ButtonSaveInFile.Content = OsLocalization.Optimizer.Label45;
             ButtonLoadFromFile.Content = OsLocalization.Optimizer.Label46;
+            LabelRobustnessMetric.Content = OsLocalization.Optimizer.Label53;
+            LabelTotalProfit.Content = OsLocalization.Optimizer.Label54;
+            LabelAverageProfitFactor.Content = OsLocalization.Optimizer.Label55;
+            LabelAverageProfitPersent.Content = OsLocalization.Optimizer.Label56;
 
             Title += "   " + master.StrategyName;
             
@@ -199,11 +209,11 @@ namespace OsEngine.OsOptimizer
                 row.Cells.Add(cell);
 
                 DataGridViewTextBoxCell cell2 = new DataGridViewTextBoxCell();
-                cell2.Value = fazes[i].TimeStart.ToShortDateString();
+                cell2.Value = fazes[i].TimeStart.ToString(OsLocalization.ShortDateFormatString);
                 row.Cells.Add(cell2);
 
                 DataGridViewTextBoxCell cell3 = new DataGridViewTextBoxCell();
-                cell3.Value = fazes[i].TimeEnd.ToShortDateString();
+                cell3.Value = fazes[i].TimeEnd.ToString(OsLocalization.ShortDateFormatString);
                 row.Cells.Add(cell3);
 
                 DataGridViewTextBoxCell cell4 = new DataGridViewTextBoxCell();
@@ -317,6 +327,13 @@ namespace OsEngine.OsOptimizer
             column8.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             _gridResults.Columns.Add(column8);
 
+            DataGridViewColumn column9 = new DataGridViewColumn();
+            column9.CellTemplate = cell0;
+            column9.HeaderText = "Sharp Ratio";
+            column9.ReadOnly = false;
+            column9.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            _gridResults.Columns.Add(column9);
+
             DataGridViewButtonColumn column11 = new DataGridViewButtonColumn();
             column11.CellTemplate = new DataGridViewButtonCell();
             column11.HeaderText = OsLocalization.Optimizer.Message40;
@@ -395,6 +412,12 @@ namespace OsEngine.OsOptimizer
             {
                 _gridResults.Columns[9].HeaderText += " vvv";
             }
+
+            _gridResults.Columns[10].HeaderText = "Sharp Ratio";
+            if (_sortBotsType == SortBotsType.SharpRatio)
+            {
+                _gridResults.Columns[10].HeaderText += " vvv";
+            }
         }
 
         /// <summary>
@@ -456,6 +479,7 @@ namespace OsEngine.OsOptimizer
                 }
 
                 DataGridViewRow row = new DataGridViewRow();
+                row.Height = 30;
                 row.Cells.Add(new DataGridViewTextBoxCell());
 
                 //if (report.TabsReports.Count == 1)
@@ -488,7 +512,7 @@ namespace OsEngine.OsOptimizer
                 row.Cells.Add(cell6);
 
                 DataGridViewTextBoxCell cell7 = new DataGridViewTextBoxCell();
-                cell7.Value = report.AverageProfitPercent.ToStringWithNoEndZero();
+                cell7.Value = report.AverageProfitPercentOneContract.ToStringWithNoEndZero();
                 row.Cells.Add(cell7);
 
                 DataGridViewTextBoxCell cell8 = new DataGridViewTextBoxCell();
@@ -503,14 +527,17 @@ namespace OsEngine.OsOptimizer
                 cell10.Value = report.Recovery.ToStringWithNoEndZero();
                 row.Cells.Add(cell10);
 
-
-                DataGridViewButtonCell cell11 = new DataGridViewButtonCell();
-                cell11.Value = OsLocalization.Optimizer.Message40;
+                DataGridViewTextBoxCell cell11 = new DataGridViewTextBoxCell();
+                cell11.Value = report.SharpRatio.ToStringWithNoEndZero();
                 row.Cells.Add(cell11);
 
                 DataGridViewButtonCell cell12 = new DataGridViewButtonCell();
-                cell12.Value = OsLocalization.Optimizer.Message42;
+                cell12.Value = OsLocalization.Optimizer.Message40;
                 row.Cells.Add(cell12);
+
+                DataGridViewButtonCell cell13 = new DataGridViewButtonCell();
+                cell13.Value = OsLocalization.Optimizer.Message42;
+                row.Cells.Add(cell13);
 
                 _gridResults.Rows.Add(row);
 
@@ -566,7 +593,7 @@ namespace OsEngine.OsOptimizer
                 return true;
             }
             else if (sortType == SortBotsType.AverageProfitPercent &&
-                     rep1.AverageProfitPercent < rep2.AverageProfitPercent)
+                     rep1.AverageProfitPercentOneContract < rep2.AverageProfitPercentOneContract)
             {
                 return true;
             }
@@ -582,6 +609,11 @@ namespace OsEngine.OsOptimizer
             }
             else if (sortType == SortBotsType.Recovery &&
                      rep1.Recovery < rep2.Recovery)
+            {
+                return true;
+            }
+            else if (sortType == SortBotsType.SharpRatio &&
+                     rep1.SharpRatio < rep2.SharpRatio)
             {
                 return true;
             }
@@ -617,7 +649,7 @@ namespace OsEngine.OsOptimizer
             row.Cells.Add(cell6);
 
             DataGridViewTextBoxCell cell7 = new DataGridViewTextBoxCell();
-            cell7.Value = report.AverageProfitPercent.ToStringWithNoEndZero();
+            cell7.Value = report.AverageProfitPercentOneContract.ToStringWithNoEndZero();
             row.Cells.Add(cell7);
 
             DataGridViewTextBoxCell cell8 = new DataGridViewTextBoxCell();
@@ -656,12 +688,12 @@ namespace OsEngine.OsOptimizer
                 return;
             }
 
-            if (e.ColumnIndex == 10)
+            if (e.ColumnIndex == 11)
             {
                 ShowBotChartDialog(e);
             }
 
-            if (e.ColumnIndex == 11)
+            if (e.ColumnIndex == 12)
             {
                 ShowParamsDialog(e);
             }
@@ -692,6 +724,11 @@ namespace OsEngine.OsOptimizer
             }
 
             BotPanel bot = _master.TestBot(fazeReport, fazeReport.Reports[e.RowIndex]);
+
+            if(bot == null)
+            {
+                return;
+            }
 
             bot.ShowChartDialog();
         }
@@ -772,6 +809,10 @@ namespace OsEngine.OsOptimizer
             else if (columnSelect == 9)
             {
                 _sortBotsType = SortBotsType.Recovery;
+            }
+            else if (columnSelect == 10)
+            {
+                _sortBotsType = SortBotsType.SharpRatio;
             }
             else
             {

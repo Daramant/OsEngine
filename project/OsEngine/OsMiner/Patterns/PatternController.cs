@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
+using System.Windows.Forms.DataVisualization.Charting;
 using System.Windows.Forms.Integration;
 using System.Windows.Shapes;
 using OsEngine.Charts;
@@ -100,12 +101,19 @@ namespace OsEngine.OsMiner.Patterns
             if (_ui == null)
             {
                 _ui = new PatternControllerUi(this);
+                _ui.Closed += _ui_Closed;
                 _ui.Show();
             }
             else
             {
                 _ui.Focus();
             }
+        }
+
+        private void _ui_Closed(object sender, EventArgs e)
+        {
+            _ui.Closed -= _ui_Closed;
+            _ui = null;
         }
 
         /// <summary>
@@ -527,6 +535,7 @@ namespace OsEngine.OsMiner.Patterns
         public void ShowJournal()
         {
             Journal.Journal journal = new Journal.Journal("",StartProgram.IsOsMiner);
+
             for (int i = 0; i < PositionsInTrades.Count; i++)
             {
                 journal.SetNewDeal(PositionsInTrades[i]);
@@ -940,6 +949,7 @@ namespace OsEngine.OsMiner.Patterns
         {
             Order newOrder = new Order();
             newOrder.SecurityNameCode = security.Name;
+            newOrder.SecurityClassCode = "";
             newOrder.Price = price;
             newOrder.NumberUser = index;
             newOrder.Volume = 1;
@@ -947,6 +957,7 @@ namespace OsEngine.OsMiner.Patterns
             newOrder.Side = SideInter;
             newOrder.TimeCallBack = time;
             newOrder.TimeCreate = time;
+            newOrder.PortfolioNumber = "MinerFackePortfolio";
 
             Position newPosition = new Position();
             newPosition.Direction = SideInter;
@@ -962,6 +973,7 @@ namespace OsEngine.OsMiner.Patterns
             trade.Price = price;
             trade.NumberTrade = index + 1.ToString();
             trade.Time = time;
+            trade.SecurityNameCode = newOrder.SecurityNameCode;
             newPosition.SetTrade(trade);
 
             return newPosition;
@@ -975,10 +987,13 @@ namespace OsEngine.OsMiner.Patterns
         {
             Order newOrder = new Order();
             newOrder.SecurityNameCode = position.SecurityName;
+            newOrder.SecurityClassCode = "";
             newOrder.Price = price;
             newOrder.NumberUser = index;
             newOrder.Volume = 1;
             newOrder.NumberMarket = index.ToString();
+            newOrder.PortfolioNumber = "MinerFackePortfolio";
+
 
             if (SideInter == Side.Buy)
             {
@@ -996,6 +1011,7 @@ namespace OsEngine.OsMiner.Patterns
 
             MyTrade trade = new MyTrade();
             trade.Volume = 1;
+            trade.SecurityNameCode = newOrder.SecurityNameCode;
             trade.Side = newOrder.Side;
             trade.NumberOrderParent = index.ToString();
             trade.Price = price;
@@ -1615,7 +1631,7 @@ namespace OsEngine.OsMiner.Patterns
                 _volume = (Volume)_chart.CreateIndicator(_volume, "VolumeArea");
             }
             _volume.Process(series.Candles);
-            
+
         }
 
         /// <summary>
@@ -1766,7 +1782,6 @@ namespace OsEngine.OsMiner.Patterns
                 }
             }
         }
-
     }
 
     /// <summary>

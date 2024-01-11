@@ -18,11 +18,12 @@ namespace OsEngine.Logging
          public ServerWebhookDeliveryUi() // constructor / конструктор
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
 
             ServerWebhook serverWebhook = ServerWebhook.GetServer();
 
             TextBoxSlackBotToken.Text = serverWebhook.SlackBotToken;
-            CheckBoxSendScreenshots.IsChecked = serverWebhook.MustSendChartScreenshots;
             TextBoxWebhooks.Text = "";
 
             if (serverWebhook.Webhooks != null)
@@ -33,11 +34,10 @@ namespace OsEngine.Logging
                 }
             }
 
-            Title = OsLocalization.Logging.TitleEmailServer;
+            Title = OsLocalization.Logging.Label21;
             ButtonAccept.Content = OsLocalization.Logging.Button1;
             Label16.Content = OsLocalization.Logging.Label16;
             Label17.Content = OsLocalization.Logging.Label17;
-            CheckBoxSendScreenshots.Content = OsLocalization.Logging.Label18;
 
             this.Activate();
             this.Focus();
@@ -47,7 +47,6 @@ namespace OsEngine.Logging
         {
             ServerWebhook serverWebhook = ServerWebhook.GetServer();
             serverWebhook.SlackBotToken = TextBoxSlackBotToken.Text;
-            serverWebhook.MustSendChartScreenshots = CheckBoxSendScreenshots.IsChecked.Value;
 
             string[] lockal = TextBoxWebhooks.Text.Split('\r');
 

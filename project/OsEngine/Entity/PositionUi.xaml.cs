@@ -35,6 +35,9 @@ namespace OsEngine.Entity
             _startProgramm = startProgram;
             _position = position;
             InitializeComponent();
+            _currentCulture = OsLocalization.CurCulture;
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             CreateMainTable();
             CreateOrdersTable();
             CreateTradeTable();
@@ -50,6 +53,8 @@ namespace OsEngine.Entity
             this.Activate();
             this.Focus();
         }
+
+        CultureInfo _currentCulture;
 
         StartProgram _startProgramm;
 
@@ -91,10 +96,18 @@ namespace OsEngine.Entity
             nRow.Cells[0].Value = position.Number;
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
-            nRow.Cells[1].Value = position.TimeCreate;
+            nRow.Cells[1].Value = position.TimeCreate.ToString(_currentCulture);
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
-            nRow.Cells[2].Value = position.TimeClose;
+
+            if (position.TimeClose != position.TimeOpen)
+            {
+                nRow.Cells[2].Value = position.TimeClose.ToString(_currentCulture);
+            }
+            else
+            {
+                nRow.Cells[2].Value = "";
+            }
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
             nRow.Cells[3].Value = position.NameBot;
@@ -210,7 +223,7 @@ namespace OsEngine.Entity
 
             DataGridViewButtonCell timeButton = new DataGridViewButtonCell();
             nRow.Cells.Add(timeButton);
-            nRow.Cells[2].Value = order.TimeCallBack;
+            nRow.Cells[2].Value = order.TimeCallBack.ToString(_currentCulture);
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
             nRow.Cells[3].Value = order.SecurityNameCode;
@@ -541,7 +554,7 @@ namespace OsEngine.Entity
 
             DataGridViewButtonCell timeButton = new DataGridViewButtonCell();
             nRow.Cells.Add(timeButton);
-            nRow.Cells[3].Value = trade.Time;
+            nRow.Cells[3].Value = trade.Time.ToString(_currentCulture);
 
             nRow.Cells.Add(new DataGridViewTextBoxCell());
             nRow.Cells[4].Value = trade.Price.ToStringWithNoEndZero();
@@ -766,9 +779,14 @@ namespace OsEngine.Entity
             int number;
             try
             {
-                number = _openOrdersGrid.CurrentCell.RowIndex;
+                number = _tradesGrid.CurrentCell.RowIndex;
             }
             catch (Exception)
+            {
+                return;
+            }
+
+            if(number >= _tradesGrid.Rows.Count)
             {
                 return;
             }

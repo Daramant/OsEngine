@@ -507,8 +507,6 @@ namespace OsEngine.Market.Servers.BitMex
             }
         }
 
-
-
         private bool _portfolioStarted = false; // already subscribed to portfolios / уже подписались на портфели
 
         /// <summary>
@@ -1130,6 +1128,12 @@ namespace OsEngine.Market.Servers.BitMex
                             }
                             else // (quotes.data[i].side == "Buy")
                             {
+                             if (depth.Bids.Find(asc => asc.Id == quotes.data[i].id) != null)
+                                {
+                                    depth.Bids.Find(asc => asc.Id == quotes.data[i].id).Bid = quotes.data[i].size;
+                                }
+                                else
+                                {
                                 if (quotes.data[i].price == null || 
                                     quotes.data[i].price == "0")
                                 {
@@ -1149,7 +1153,7 @@ namespace OsEngine.Market.Servers.BitMex
                                             Id = quotes.data[i].id
                                         });
                                     }
-                                    else if (j != depth.Bids.Count - 1 && id > depth.Bids[i].Id && id < depth.Bids[j + 1].Id)
+                                    else if (j != depth.Bids.Count - 1 && id > depth.Bids[j].Id && id < depth.Bids[j + 1].Id)
                                     {
                                         depth.Bids.Insert(j + 1, new MarketDepthLevel()
                                         {
@@ -1174,6 +1178,7 @@ namespace OsEngine.Market.Servers.BitMex
                                         depth.Asks.RemoveAt(0);
                                     }
                                 }
+                            }
                             }
                         }
 
@@ -2020,6 +2025,16 @@ namespace OsEngine.Market.Servers.BitMex
         }
 
         /// <summary>
+        /// Order price change
+        /// </summary>
+        /// <param name="order">An order that will have a new price</param>
+        /// <param name="newPrice">New price</param>
+        public void ChangeOrderPrice(Order order, decimal newPrice)
+        {
+
+        }
+
+        /// <summary>
         /// cancel orders from the trading system
         /// отозвать ордер из торговой системы
         /// </summary>
@@ -2035,6 +2050,11 @@ namespace OsEngine.Market.Servers.BitMex
         /// отозвать все ордера из торговой системы
         /// </summary>
         public void CancelAllOrders()
+        {
+
+        }
+
+        public void CancelAllOrdersToSecurity(Security security)
         {
 
         }
@@ -2111,6 +2131,16 @@ namespace OsEngine.Market.Servers.BitMex
             {
                 LogMessageEvent(message, type);
             }
+        }
+
+        public void ResearchTradesToOrders(List<Order> orders)
+        {
+
+        }
+
+        public List<Candle> GetLastCandleHistory(Security security, TimeFrameBuilder timeFrameBuilder, int candleCount)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

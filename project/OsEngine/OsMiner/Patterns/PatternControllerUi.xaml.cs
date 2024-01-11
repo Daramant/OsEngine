@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
@@ -29,6 +30,7 @@ namespace OsEngine.OsMiner.Patterns
         public PatternControllerUi(PatternController pattern)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
             _pattern = pattern;
 
             InitializeTabDataSeries();
@@ -116,7 +118,6 @@ namespace OsEngine.OsMiner.Patterns
         }
 
 
-// Auto pattern search
 // Авто поиск паттернов
 
         private void InitializeMiningTab()
@@ -185,7 +186,6 @@ namespace OsEngine.OsMiner.Patterns
             _pattern.ShowTestResults();
         }
 
-// pattern search tab
 // вкладка поиска паттернов
 
         void InitializeTabPatternsSearch()
@@ -295,7 +295,6 @@ namespace OsEngine.OsMiner.Patterns
             PaintGridPatternsToClose();
         }
 
-// individual tabs patterns
 // индивидуальные вкладки паттернов
 
         void TabControlTypePatternsToFind_MouseUp(object sender, MouseButtonEventArgs e)
@@ -1013,6 +1012,10 @@ namespace OsEngine.OsMiner.Patterns
         {
             _dataServer.SetNewSet(ComboBoxSets.SelectedItem.ToString());
             PaintGridDataSeries();
+
+            Thread.Sleep(3000);
+
+            _pattern.PaintPrimeChart();
         }
 
         /// <summary>
@@ -1071,9 +1074,9 @@ namespace OsEngine.OsMiner.Patterns
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
                     nRow.Cells[3].Value = securities[i].Security.PriceStep;
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
-                    nRow.Cells[4].Value = securities[i].TimeStart;
+                    nRow.Cells[4].Value = securities[i].TimeStart.ToString(OsLocalization.ShortDateFormatString);
                     nRow.Cells.Add(new DataGridViewTextBoxCell());
-                    nRow.Cells[5].Value = securities[i].TimeEnd;
+                    nRow.Cells[5].Value = securities[i].TimeEnd.ToString(OsLocalization.ShortDateFormatString);
 
                     _myGridView.Rows.Add(nRow);
                 }

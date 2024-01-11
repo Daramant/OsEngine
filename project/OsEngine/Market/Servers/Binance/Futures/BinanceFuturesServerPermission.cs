@@ -17,31 +17,31 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         public bool DataFeedTf1SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf2SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf5SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf10SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf15SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf20SecondCanLoad
         {
-            get { return false; ; }
+            get { return true; }
         }
         public bool DataFeedTf30SecondCanLoad
         {
-            get { return false; }
+            get { return true; }
         }
         public bool DataFeedTf1MinuteCanLoad
         {
@@ -92,9 +92,19 @@ namespace OsEngine.Market.Servers.Binance.Futures
 
         #region Trade permission
 
+        public bool MarketOrdersIsSupport
+        {
+            get { return true; }
+        }
+
         public bool IsTradeServer
         {
             get { return true; }
+        }
+
+        public bool IsCanChangeOrderPrice
+        {
+            get { return false; }
         }
 
         public TimeFramePermission TradeTimeFramePermission
@@ -102,7 +112,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
             get { return _tradeTimeFramePermission; }
         }
 
-        public int WaitTimeAfterFirstStartToSendOrders
+        public int WaitTimeSecondsAfterFirstStartToSendOrders
         {
             get { return 1; }
         }
@@ -131,6 +141,53 @@ namespace OsEngine.Market.Servers.Binance.Futures
                 TimeFrameHour4IsOn = true,
                 TimeFrameDayIsOn = true
             };
+
+        public bool UseStandartCandlesStarter
+        {
+            get { return false; }
+        }
+
+        public bool IsUseLotToCalculateProfit
+        {
+            get { return false; }
+        }
+
+        public bool ManuallyClosePositionOnBoard_IsOn
+        {
+            get { return true; }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ValuesForTrimmingName
+        {
+            get
+            {
+                string[] values = new string[]
+                {
+                    "_LONG",
+                    "_SHORT",
+                    "_BOTH"
+                };
+
+                return values;
+            }
+        }
+
+        public string[] ManuallyClosePositionOnBoard_ExceptionPositionNames
+        {
+            get
+            {
+                string[] values = new string[]
+                {
+                    "BNB",
+                    "USDT",
+                    "USD",
+                    "BTC",
+                    "ETH"
+                };
+
+                return values;
+            }
+        }
 
         #endregion
     }

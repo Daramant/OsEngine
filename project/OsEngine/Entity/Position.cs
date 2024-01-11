@@ -4,6 +4,7 @@
 */
 
 using OsEngine.Market;
+using OsEngine.Market.Servers;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,19 +13,20 @@ using System.Text;
 namespace OsEngine.Entity
 {
     /// <summary>
-    /// Deal
-    /// Сделка
+    /// Position
     /// </summary>
     public class Position
     {
+        /// <summary>
+        /// Constructor
+        /// </summary>
         public Position()
         {
             State = PositionStateType.None;
         }
 
         /// <summary>
-        /// open order
-        /// ордер, открывший сделку
+        /// List of orders involved in opening a position
         /// </summary>
         public List<Order> OpenOrders
         {
@@ -36,8 +38,7 @@ namespace OsEngine.Entity
         private List<Order> _openOrders;
 
         /// <summary>
-        /// load a new order to open a position
-        /// загрузить в позицию новый ордер открывающий позицию
+        /// Load a new order to open a position
         /// </summary>
         /// <param name="openOrder"></param>
         public void AddNewOpenOrder(Order openOrder)
@@ -61,15 +62,13 @@ namespace OsEngine.Entity
                 {
                     _openOrders.Add(openOrder);
                 }
-
             }
             
             State = PositionStateType.Opening;
         }
 
         /// <summary>
-        /// closing orders
-        /// ордера, закрывающие сделку
+        /// List of orders involved in closing a position
         /// </summary>
         public List<Order> CloseOrders
         {
@@ -81,8 +80,7 @@ namespace OsEngine.Entity
         private List<Order> _closeOrders;
 
         /// <summary>
-        /// trades of this position
-        /// трейды этой позиции
+        /// Trades of this position
         /// </summary>
         public List<MyTrade> MyTrades
         {
@@ -123,8 +121,7 @@ namespace OsEngine.Entity
         private List<MyTrade> _myTrades;
 
         /// <summary>
-        /// load a new order to a position
-        /// загрузить в позицию новый ордер закрывающий позицию
+        /// Load a new order to a position
         /// </summary>
         /// <param name="closeOrder"></param>
         public void AddNewCloseOrder(Order closeOrder)
@@ -154,8 +151,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// are there any active orders to open a position
-        /// есть ли активные ордера на открытие позиции
+        /// Are there any active orders to open a position
         /// </summary>
         public bool OpenActiv
         {
@@ -179,8 +175,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// are there any active orders to close a position
-        /// есть ли активные ордера на закрытие позиции
+        /// Are there any active orders to close a position
         /// </summary>
         public bool CloseActiv
         {
@@ -205,52 +200,54 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// whether stop is active
-        /// активен ли стопПриказ
+        /// Whether stop is active
         /// </summary>
         public bool StopOrderIsActiv;
 
         /// <summary>
-        /// order price stop order
-        /// цена заявки стоп приказа
+        /// Order price stop order
         /// </summary>
         public decimal StopOrderPrice;
 
         /// <summary>
-        /// stop - the price, the price after which the order will be entered into the system
-        /// стоп - цена, цена после достижения которой в систему будет выставлени приказ
+        /// Stop - the price, the price after which the order will be entered into the system
         /// </summary>
         public decimal StopOrderRedLine;
 
         /// <summary>
-        /// is a profit active order
-        /// активен ли профит приказ
+        /// Whether the position will be closed by a stop using a market order
+        /// </summary>
+        public bool StopIsMarket;
+
+        /// <summary>
+        /// Is a profit active order
         /// </summary>
         public bool ProfitOrderIsActiv;
 
         /// <summary>
-        /// order price order profit
-        /// цена заявки профит приказа
+        /// Order price order profit
         /// </summary>
         public decimal ProfitOrderPrice;
 
         /// <summary>
-        /// profit - the price, the price after which the order will be entered into the system
-        /// профит - цена, цена после достижения которой в систему будет выставлени приказ
+        /// Profit - the price, the price after which the order will be entered into the system
         /// </summary>
         public decimal ProfitOrderRedLine;
 
         /// <summary>
-        /// buy / sell direction
-        /// направление сделки Buy / Sell
+        /// Whether the position will be closed by a profit using a market order
+        /// </summary>
+        public bool ProfitIsMarket;
+
+        /// <summary>
+        /// Buy / sell direction
         /// </summary>
         public Side Direction;
 
         private PositionStateType _state;
 
         /// <summary>
-        /// transaction status Open / Close / Opening
-        /// статус сделки Open / Close / Opening
+        /// Transaction status Open / Close / Opening
         /// </summary>
         public PositionStateType State
         {
@@ -262,14 +259,12 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// position number
-        /// номер позиции
+        /// Position number
         /// </summary>
         public int Number;
 
         /// <summary>
         /// Tool code for which the position is open
-        /// Код инструмента по которому открыта позиция
         /// </summary>
         public string SecurityName
         {
@@ -293,44 +288,37 @@ namespace OsEngine.Entity
         private string _securityName;
 
         /// <summary>
-        /// name of the bot who owns the deal
-        /// имя бота, которому принадлежит сделка
+        /// Name of the bot who owns the deal
         /// </summary>
         public string NameBot;
 
         /// <summary>
-        /// the amount of profit on the operation in percent
-        /// количество прибыли по операции в процентах 
+        /// The amount of profit on the operation in percent
         /// </summary>
         public decimal ProfitOperationPersent;
 
         /// <summary>
-        /// the amount of profit on the operation in absolute terms
-        /// количество прибыли по операции в абсолютном выражении
+        /// The amount of profit on the operation in absolute terms
         /// </summary>
         public decimal ProfitOperationPunkt;
 
         /// <summary>
-        /// comment
-        /// комментарий
+        /// Comment
         /// </summary>
         public string Comment;
 
         /// <summary>
-        /// signal type to open
-        /// тип сигнала на открытие
+        /// Signal type to open
         /// </summary>
         public string SignalTypeOpen;
 
         /// <summary>
-        /// closing signal type
-        /// тип сигнала за закрытие
+        /// Closing signal type
         /// </summary>
         public string SignalTypeClose;
 
         /// <summary>
-        /// maximum volume by position
-        /// максимальный объём по позиции
+        /// Maximum volume by position
         /// </summary>
         public decimal MaxVolume
         {
@@ -344,13 +332,11 @@ namespace OsEngine.Entity
                 }
 
                 return value;
-
             }
         }
 
         /// <summary>
-        /// number of contracts open per trade
-        /// количество контрактов открытых в сделке
+        /// Number of contracts open per trade
         /// </summary>
         public decimal OpenVolume 
         {
@@ -387,13 +373,11 @@ namespace OsEngine.Entity
                 decimal value = volumeOpen - valueClose;
 
                 return value;
-
             }
         }
 
         /// <summary>
-        /// number of contracts awaiting opening
-        /// количество котрактов ожидающих открытия
+        /// Number of contracts awaiting opening
         /// </summary>
         public decimal WaitVolume
         {
@@ -415,8 +399,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// position opening price
-        /// цена открытия позиции
+        /// Position opening price
         /// </summary>
         public decimal EntryPrice
         {
@@ -449,8 +432,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// position closing price
-        /// цена закрытия позиции
+        /// Position closing price
         /// </summary>
         public decimal ClosePrice
         {
@@ -472,7 +454,6 @@ namespace OsEngine.Entity
                         volume += _closeOrders[i].VolumeExecute;
                         price += _closeOrders[i].VolumeExecute*_closeOrders[i].PriceReal;
                     }
-
                 }
                 if (volume == 0)
                 {
@@ -483,11 +464,13 @@ namespace OsEngine.Entity
             }
         }
 
+        /// <summary>
+        /// Multiplier for position analysis, used for the needs of the platform. IMPORTANT. Don't change the value.
+        /// </summary>
         public decimal MultToJournal = 100;
 
         /// <summary>
-        /// check the incoming order for this transaction
-        /// проверить входящий ордер, на принадлежность этой сделке
+        /// Check the incoming order for this transaction
         /// </summary>
         public void SetOrder(Order newOrder)
         {
@@ -588,7 +571,12 @@ namespace OsEngine.Entity
 
             if (closeOrder != null)
             {
-                closeOrder.State = newOrder.State;
+                if (closeOrder.State != OrderStateType.Done
+                   || closeOrder.Volume != closeOrder.VolumeExecute)    //AVP 
+                { 
+                    closeOrder.State = newOrder.State;
+                }
+
                 closeOrder.NumberMarket = newOrder.NumberMarket;
 
                 if (closeOrder.TimeCallBack == DateTime.MinValue)
@@ -611,7 +599,6 @@ namespace OsEngine.Entity
                 else if (closeOrder.State == OrderStateType.Cancel && !CloseActiv && OpenVolume != 0)
                 {
                     // if not fully closed and this is the last order in the closing orders
-                    // если не полностью закрылись и это последний ордер в ордерах на закрытие
                     //AlertMessageManager.ThrowAlert(null, "Cancel", "");
                     State = PositionStateType.ClosingFail;
                 }
@@ -627,6 +614,9 @@ namespace OsEngine.Entity
             }
         }
 
+        /// <summary>
+        /// calculates the values of the fields ProfitOperationPersent and ProfitOperationPunkt
+        /// </summary>
         private void CalculateProfitToPosition()
         {
             decimal entryPrice = EntryPrice;
@@ -648,55 +638,59 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// check incoming trade for this trade
-        /// проверить входящий трейд, на принадлежность этой сделке
+        /// Check incoming trade for this trade
         /// </summary>
         public void SetTrade(MyTrade trade)
         {
             _myTrades = null;
+
             if (_openOrders != null)
             {
-
                 for (int i = 0; i < _openOrders.Count; i++)
                 {
-                    if ((_openOrders[i].NumberMarket == trade.NumberOrderParent
-                        ||_openOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
-                        && _openOrders[i].SecurityNameCode == trade.SecurityNameCode)
+                    Order curOrdOpen = _openOrders[i];
+
+                    if (curOrdOpen.NumberMarket == trade.NumberOrderParent
+                        && curOrdOpen.SecurityNameCode == trade.SecurityNameCode)
                     {
                         trade.NumberPosition = Number.ToString();
-                        _openOrders[i].SetTrade(trade);
-                        if (OpenVolume != 0)
+                        curOrdOpen.SetTrade(trade);
+
+                        if (OpenVolume != 0 &&
+                            State == PositionStateType.Opening)
                         {
                             State = PositionStateType.Open;
                         }
                         else if (OpenVolume == 0)
                         {
-                            _openOrders[i].TimeDone = trade.Time;
+                            curOrdOpen.TimeDone = trade.Time;
                             State = PositionStateType.Done;
                         }
                     }
                 }
             }
 
-            if (CloseOrders != null)
+            if (_closeOrders != null)
             {
-                for (int i = 0; i < CloseOrders.Count; i++)
+                for (int i = 0; i < _closeOrders.Count; i++)
                 {
-                    if ((CloseOrders[i].NumberMarket == trade.NumberOrderParent 
-                        || CloseOrders[i].NumberUser.ToString() == trade.NumberOrderParent)
-                        && CloseOrders[i].SecurityNameCode == trade.SecurityNameCode)
+                    Order curOrdClose = _closeOrders[i];
+
+                    if (curOrdClose.NumberMarket == trade.NumberOrderParent
+                        && curOrdClose.SecurityNameCode == trade.SecurityNameCode)
                     {
                         trade.NumberPosition = Number.ToString();
-                        CloseOrders[i].SetTrade(trade);
+                        curOrdClose.SetTrade(trade);
+
                         if (OpenVolume == 0)
                         {
                             State = PositionStateType.Done;
-                            CloseOrders[i].TimeDone = trade.Time;
+                            curOrdClose.TimeDone = trade.Time;
                         }
                         else if (OpenVolume < 0)
                         {
                             State = PositionStateType.ClosingSurplus;
-                        }      
+                        }
                     }
                 }
             }
@@ -706,7 +700,7 @@ namespace OsEngine.Entity
                 decimal entryPrice = EntryPrice;
                 decimal closePrice = ClosePrice;
 
-                if(entryPrice != 0 && closePrice != 0)
+                if (entryPrice != 0 && closePrice != 0)
                 {
                     if (Direction == Side.Buy)
                     {
@@ -723,8 +717,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// load bid with ask into the trade to recalculate the profit
-        /// загрузить в сделку бид с аском, чтобы пересчитать прибыльность
+        /// Load bid with ask into the trade to recalculate the profit
         /// </summary>
         public void SetBidAsk(decimal bid, decimal ask)
         {
@@ -743,6 +736,11 @@ namespace OsEngine.Entity
 
                 decimal entryPrice = EntryPrice;
 
+                if(entryPrice == 0)
+                {
+                    return;
+                }
+
                 if (Direction == Side.Buy)
                 {
                     ProfitOperationPersent = ask / entryPrice * 100 - 100;
@@ -757,8 +755,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// take the string to save
-        /// взять строку для сохранения
+        /// Take the string to save
         /// </summary>
         public StringBuilder GetStringForSave()
         {
@@ -818,14 +815,15 @@ namespace OsEngine.Entity
                 }
             }
 
+            result.Append("#" + StopIsMarket);
+            result.Append("#" + ProfitIsMarket);
             result.Append("#" + SecurityName);
             
             return result;
         }
 
         /// <summary>
-        /// load trade from incoming line
-        /// загрузить сделку из входящей строки
+        /// Load trade from incoming line
         /// </summary>
         public void SetDealFromString(string save)
         {
@@ -896,6 +894,19 @@ namespace OsEngine.Entity
                     newOrder.SetOrderFromString(saveOrd);
                     AddNewCloseOrder(newOrder);
                 }
+                else
+                {
+                    break;
+                }
+            }
+
+            if(arraySave[arraySave.Length - 3] == "True" 
+                || arraySave[arraySave.Length - 3] == "False"
+                || arraySave[arraySave.Length - 3] == "true"
+                || arraySave[arraySave.Length - 3] == "false")
+            {
+                StopIsMarket = Convert.ToBoolean(arraySave[arraySave.Length - 3]);
+                ProfitIsMarket = Convert.ToBoolean(arraySave[arraySave.Length - 2]);
             }
 
             SecurityName = arraySave[arraySave.Length - 1];
@@ -906,8 +917,7 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// position creation time
-        /// время создания позиции
+        /// Position creation time
         /// </summary>
         public DateTime TimeCreate
         {
@@ -926,8 +936,7 @@ namespace OsEngine.Entity
         private DateTime _timeCreate;
 
         /// <summary>
-        /// position closing time
-        /// время закрытия позиции
+        /// Position closing time
         /// </summary>
         public DateTime TimeClose
         {
@@ -949,11 +958,8 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        ///
-        /// position opening time. The time when the first transaction on our position passed on the exchange
+        /// Position opening time. The time when the first transaction on our position passed on the exchange
         /// if the transaction is not open yet, it will return the time to create the position
-        /// время открытия позиции. Время когда на бирже прошла первая сделка по нашей позиции
-        /// если сделка ещё не открыта, вернёт время создания позиции
         /// </summary>
         public DateTime TimeOpen
         {
@@ -983,12 +989,12 @@ namespace OsEngine.Entity
                 return TimeCreate;
             }
         }
-        // profit for the portfolio
-        // профит для портфеля
 
+
+        // profit for the portfolio
+        
         /// <summary>
-        /// the amount of profit relative to the portfolio in percentage
-        /// количество прибыли относительно портфеля в процентах
+        /// The amount of profit relative to the portfolio in percentage
         /// </summary>
         public decimal ProfitPortfolioPersent
         {
@@ -1004,19 +1010,18 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// тип комиссии для позиции
+        /// Commission type for the position
         /// </summary>
         public ComissionType ComissionType;
 
         /// <summary>
-        /// величина комиссии
         /// comission value
         /// </summary>
         public decimal ComissionValue;
 
         /// <summary>
         /// the amount of profit relative to the portfolio in absolute terms
-        /// количество прибыли относительно портфеля в абсолютном выражении, С УЧЁТОМ КОМИССИИ И СТОИМОСТЕЙ ШАГА ЦЕНЫ
+        /// taking into account the commission and the price step
         /// </summary>
         public decimal ProfitPortfolioPunkt
         {
@@ -1065,29 +1070,47 @@ namespace OsEngine.Entity
                 }
             }
         }
+
+        /// <summary>
+        /// Determines whether the exchange supports multiple securities in one lot.
+        /// </summary>
         private bool IsLotServer()
         {
             if (OpenOrders != null && OpenOrders.Count > 0)
             {
-                if(OpenOrders[0].ServerType == ServerType.Plaza ||
-                    OpenOrders[0].ServerType == ServerType.QuikDde ||
-                    OpenOrders[0].ServerType == ServerType.QuikLua ||
-                    OpenOrders[0].ServerType == ServerType.SmartCom ||
-                    OpenOrders[0].ServerType == ServerType.Tinkoff ||
-                    OpenOrders[0].ServerType == ServerType.Transaq)
+                ServerType serverType = OpenOrders[0].ServerType;
+
+                if(serverType == ServerType.Tester ||
+                    serverType == ServerType.None ||
+                    serverType == ServerType.Optimizer ||
+                    serverType == ServerType.Miner)
+                {
+                    return false;
+                }
+
+                if(serverType == ServerType.QuikDde
+                    || serverType == ServerType.QuikLua
+                    || serverType == ServerType.Transaq
+                    || serverType == ServerType.Plaza)
                 {
                     return true;
                 }
 
-                return false;
+                IServerPermission permission = ServerMaster.GetServerPermission(serverType);
+
+                if(permission == null)
+                {
+                    return false;
+                }
+
+                return permission.IsUseLotToCalculateProfit;
 
             }
-            return true;
+            return false;
         }
 
         /// <summary>
-        /// the amount of total position's commission
-        /// количество суммарной комиссия по позиции
+        /// The amount of total position's commission
         /// </summary>
         public decimal CommissionTotal()
         {
@@ -1125,147 +1148,137 @@ namespace OsEngine.Entity
         }
 
         /// <summary>
-        /// the number of lots in one transaction
-        /// количество лотов в одной сделке
+        /// The number of lots in one transaction
         /// </summary>
         public decimal Lots;
 
         /// <summary>
-        /// price step cost
-        /// стоимость шага цены
+        /// Price step cost
         /// </summary>
         public decimal PriceStepCost;
 
         /// <summary>
-        /// price step
-        /// шаг цены
+        /// Price step
         /// </summary>
         public decimal PriceStep;
 
         /// <summary>
-        /// portfolio size at the time of opening the portfolio
-        /// размер портфеля на момент открытия портфеля
+        /// Portfolio size at the time of opening the portfolio
         /// </summary>
         public decimal PortfolioValueOnOpenPosition;
-
     }
 
     /// <summary>
-    /// way to open a deal
-    /// способ открытия сделки
+    /// Way to open a deal
     /// </summary>
     public enum PositionOpenType
     {
         /// <summary>
-        /// bid at a certain price
-        /// заявка по определённой цене
+        /// Bid at a certain price
         /// </summary>
         Limit,
 
         /// <summary>
-        /// application at any price
-        /// заявка по любой цене
+        /// Application at any price
         /// </summary>
         Market,
 
         /// <summary>
-        /// iceberg application. Application consisting of several limit orders
-        /// айсберг заявка. Заявка состоящая из нескольких лимитных заявок
+        /// Iceberg application. Application consisting of several limit orders
         /// </summary>
         Aceberg
     }
 
     /// <summary>
-    /// transaction status
-    /// статус сделки
+    /// Transaction status
     /// </summary>
     public enum PositionStateType
     {
         /// <summary>
-        /// none
-        /// не назначен
+        /// None
         /// </summary>
         None,
 
         /// <summary>
-        /// opening
-        /// открывается
+        /// Opening
         /// </summary>
         Opening,
 
         /// <summary>
-        /// closed
-        /// закрыта
+        /// Closed
         /// </summary>
         Done,
 
         /// <summary>
-        /// error
-        /// ошибка
+        /// Error
         /// </summary>
         OpeningFail,
 
         /// <summary>
-        /// opened
-        /// открыта
+        /// Opened
         /// </summary>
         Open,
 
         /// <summary>
-        /// closing
-        /// закрывается
+        /// Closing
         /// </summary>
         Closing,
 
         /// <summary>
-        /// closing fail
-        /// ошибка на закрытии
+        /// Closing fail
         /// </summary>
         ClosingFail,
 
         /// <summary>
-        /// brute force during closing.
-        /// перебор во время закрытия.
+        /// Brute force during closing
         /// </summary>
         ClosingSurplus,
 
         /// <summary>
-        /// удалена
+        /// Deleted
         /// </summary>
         Deleted
     }
 
     /// <summary>
-    /// направление сделки
+    /// Transaction direction
     /// </summary>
     public enum Side
     {
         /// <summary>
-        /// none
-        /// не определено
+        /// None
         /// </summary>
         None,
 
         /// <summary>
-        /// buy
-        /// купля
+        /// Buy
         /// </summary>
         Buy,
 
         /// <summary>
-        /// sell
-        /// продажа
+        /// Sell
         /// </summary>
         Sell
     }
 
     /// <summary>
-    /// Тип комиссии
+    /// Commission type
     /// </summary>
     public enum ComissionType
     {
+        /// <summary>
+        /// None
+        /// </summary>
         None,
+
+        /// <summary>
+        /// In percentage terms
+        /// </summary>
         Percent,
+
+        /// <summary>
+        /// Fixed value per lot
+        /// </summary>
         OneLotFix
     }
 }

@@ -26,6 +26,7 @@ using MenuItem = System.Windows.Forms.MenuItem;
 using Series = System.Windows.Forms.DataVisualization.Charting.Series;
 using System.Threading;
 using OsEngine.Layout;
+using System.Security.Cryptography;
 
 namespace OsEngine.Journal
 {
@@ -51,17 +52,18 @@ namespace OsEngine.Journal
         /// </summary>
         public JournalUi2(List<BotPanelJournal> botsJournals, StartProgram startProgram)
         {
-            InitializeComponent(); 
+            InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
             _startProgram = startProgram;
             _botsJournals = botsJournals;
             LoadGroups();
 
             ComboBoxChartType.Items.Add("Absolute");
             ComboBoxChartType.Items.Add("Persent");
-            ComboBoxChartType.SelectedItem = "Absolute";
+            ComboBoxChartType.SelectedItem = "Persent";
             ComboBoxChartType.SelectionChanged += ComboBoxChartType_SelectionChanged;
 
-            _currentCulture = CultureInfo.CurrentCulture;
+            _currentCulture = OsLocalization.CurCulture;
 
             TabControlPrime.SelectionChanged += TabControlPrime_SelectionChanged;
 
@@ -134,19 +136,16 @@ namespace OsEngine.Journal
 
             if (_allPositions != null)
             {
-                _allPositions.Clear();
                 _allPositions = null;
             }
 
             if (_longPositions != null)
             {
-                _longPositions.Clear();
                 _longPositions = null;
             }
 
             if (_shortPositions != null)
             {
-                _shortPositions.Clear();
                 _shortPositions = null;
             }
 
@@ -240,6 +239,8 @@ namespace OsEngine.Journal
         /// </summary>
         public void RePaint()
         {
+            CreatePositionsLists();
+
             if (!TabControlPrime.CheckAccess())
             {
                 TabControlPrime.Dispatcher.Invoke(RePaint);
@@ -435,7 +436,6 @@ namespace OsEngine.Journal
 
                 try
                 {
-                    CreatePositionsLists();
                     RePaint();
                 }
                 catch (Exception error)
@@ -504,7 +504,7 @@ namespace OsEngine.Journal
                 column0.CellTemplate = cell0;
                 column0.HeaderText = @"";
                 column0.ReadOnly = true;
-                column0.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                column0.Width = 200;
 
                 _gridStatistics.Columns.Add(column0);
 
@@ -530,7 +530,7 @@ namespace OsEngine.Journal
                 column3.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
                 _gridStatistics.Columns.Add(column3);
 
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows.Add(); //string addition/ добавление строки
                 }
@@ -539,34 +539,35 @@ namespace OsEngine.Journal
                 _gridStatistics.Rows[1].Cells[0].Value = OsLocalization.Journal.GridRow2;
                 _gridStatistics.Rows[2].Cells[0].Value = OsLocalization.Journal.GridRow3;
                 _gridStatistics.Rows[3].Cells[0].Value = OsLocalization.Journal.GridRow17;
+                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow18;
 
-                _gridStatistics.Rows[4].Cells[0].Value = OsLocalization.Journal.GridRow4;
-                _gridStatistics.Rows[5].Cells[0].Value = OsLocalization.Journal.GridRow5;
+                _gridStatistics.Rows[5].Cells[0].Value = OsLocalization.Journal.GridRow4;
+                _gridStatistics.Rows[6].Cells[0].Value = OsLocalization.Journal.GridRow5;
 
-                _gridStatistics.Rows[7].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[10].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[8].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[9].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[10].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[11].Cells[0].Value = OsLocalization.Journal.GridRow9;
 
 
-                _gridStatistics.Rows[12].Cells[0].Value = OsLocalization.Journal.GridRow10;
-                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow11;
-                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[18].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[13].Cells[0].Value = OsLocalization.Journal.GridRow10;
+                _gridStatistics.Rows[14].Cells[0].Value = OsLocalization.Journal.GridRow11;
+                _gridStatistics.Rows[15].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[16].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[17].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[18].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[19].Cells[0].Value = OsLocalization.Journal.GridRow12;
 
-                _gridStatistics.Rows[20].Cells[0].Value = OsLocalization.Journal.GridRow13;
-                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow14;
-                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow6;
-                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow7;
-                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow8;
-                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow9;
-                _gridStatistics.Rows[26].Cells[0].Value = OsLocalization.Journal.GridRow12;
-                _gridStatistics.Rows[27].Cells[0].Value = "";
-                _gridStatistics.Rows[28].Cells[0].Value = OsLocalization.Journal.GridRow15;
-                _gridStatistics.Rows[29].Cells[0].Value = OsLocalization.Journal.GridRow16;
+                _gridStatistics.Rows[21].Cells[0].Value = OsLocalization.Journal.GridRow13;
+                _gridStatistics.Rows[22].Cells[0].Value = OsLocalization.Journal.GridRow14;
+                _gridStatistics.Rows[23].Cells[0].Value = OsLocalization.Journal.GridRow6;
+                _gridStatistics.Rows[24].Cells[0].Value = OsLocalization.Journal.GridRow7;
+                _gridStatistics.Rows[25].Cells[0].Value = OsLocalization.Journal.GridRow8;
+                _gridStatistics.Rows[26].Cells[0].Value = OsLocalization.Journal.GridRow9;
+                _gridStatistics.Rows[27].Cells[0].Value = OsLocalization.Journal.GridRow12;
+                _gridStatistics.Rows[28].Cells[0].Value = "";
+                _gridStatistics.Rows[29].Cells[0].Value = OsLocalization.Journal.GridRow15;
+                _gridStatistics.Rows[30].Cells[0].Value = OsLocalization.Journal.GridRow16;
             }
             catch (Exception error)
             {
@@ -591,42 +592,42 @@ namespace OsEngine.Journal
 
             if (positionsAllState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = "";
                 }
             }
             if (positionsLongState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = "";
                 }
             }
             if (positionsShortState == null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = "";
                 }
             }
             if (positionsLongState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[2].Value = positionsLongState[i].ToString();
                 }
             }
             if (positionsShortState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[3].Value = positionsShortState[i].ToString();
                 }
             }
             if (positionsAllState != null)
             {
-                for (int i = 0; i < 30; i++)
+                for (int i = 0; i < 31; i++)
                 {
                     _gridStatistics.Rows[i].Cells[1].Value = positionsAllState[i].ToString();
                 }
@@ -866,14 +867,8 @@ namespace OsEngine.Journal
             nullLine.ChartArea = "ChartAreaProfit";
             nullLine.ShadowOffset = 0;
 
-
-
             try
             {
-                /*
-
-                */
-
                 decimal profitSum = 0;
                 decimal profitSumLong = 0;
                 decimal profitSumShort = 0;
@@ -986,7 +981,8 @@ namespace OsEngine.Journal
                 _chartEquity.Series.Add(nullLine);
 
                 if (minYval != decimal.MaxValue &&
-                    maxYVal != 0)
+                    maxYVal != 0 &&
+                    minYval != maxYVal)
                 {
                     decimal chartHeigh = maxYVal - minYval;
 
@@ -997,7 +993,8 @@ namespace OsEngine.Journal
                 }
 
                 if(minYvalBars != decimal.MaxValue &&
-                    maxYValBars != 0)
+                    maxYValBars != 0 &&
+                    minYvalBars != maxYValBars)
                 {
                     decimal chartHeigh = maxYValBars - minYvalBars;
                     maxYValBars = maxYValBars + chartHeigh * 0.05m;
@@ -1566,149 +1563,189 @@ namespace OsEngine.Journal
         /// <param name="positionsAll"></param>
         private void PaintDrowDown(List<Position> positionsAll)
         {
-            if (_chartDd == null)
+            try
             {
-                CreateChartDrowDown();
-            }
-
-            _chartDd.Series.Clear();
-
-            if (positionsAll == null 
-                || positionsAll.Count == 0)
-            {
-                return;
-            }
-
-            List<decimal> ddPunct = new decimal[positionsAll.Count].ToList();
-            decimal lastMax = 0;
-            decimal currentProfit = 0;
-
-            for (int i = 0; i < positionsAll.Count; i++)
-            {
-                currentProfit += positionsAll[i].ProfitPortfolioPunkt * (positionsAll[i].MultToJournal /100);
-
-                if (lastMax < currentProfit)
+                if (_chartDd == null)
                 {
-                    lastMax = currentProfit;
+                    CreateChartDrowDown();
                 }
 
-                if (currentProfit - lastMax < 0)
+                _chartDd.Series.Clear();
+
+                if (positionsAll == null
+                    || positionsAll.Count == 0)
                 {
-                    ddPunct[i] = currentProfit - lastMax;
-                }
-            }
-
-            Series drowDownPunct = new Series("SeriesDdPunct");
-            drowDownPunct.ChartType = SeriesChartType.Line;
-            drowDownPunct.Color = Color.DeepSkyBlue;  
-            drowDownPunct.LabelForeColor = Color.White;   
-            drowDownPunct.YAxisType = AxisType.Secondary;
-            drowDownPunct.ChartArea = "ChartAreaDdPunct";
-            drowDownPunct.BorderWidth = 2;
-            drowDownPunct.ShadowOffset = 2;
-
-            Series nullLine = new Series("SeriesNullLine");
-            nullLine.ChartType = SeriesChartType.Line;
-            nullLine.YAxisType = AxisType.Secondary;
-            nullLine.LabelForeColor = Color.White;
-            nullLine.ChartArea = "ChartAreaDdPunct";
-            nullLine.ShadowOffset = 0;
-
-            for (int i = 0; i < ddPunct.Count; i++)
-            {
-                decimal val = Math.Round(ddPunct[i], 6);
-                drowDownPunct.Points.Add(Convert.ToDouble(val));
-
-                drowDownPunct.Points[drowDownPunct.Points.Count - 1].AxisLabel =
-               positionsAll[i].TimeCreate.ToString(_currentCulture);
-
-                drowDownPunct.Points[drowDownPunct.Points.Count - 1].LegendText = val.ToString();
-
-                nullLine.Points.Add(0);
-                nullLine.Points[nullLine.Points.Count - 1].AxisLabel =
-                    positionsAll[i].TimeCreate.ToString(_currentCulture);
-            }
-
-            _chartDd.Series.Add(drowDownPunct);
-            _chartDd.Series.Add(nullLine);
-
-            decimal minOnY = decimal.MaxValue;
-
-            for(int i = 0;i< ddPunct.Count;i++)
-            {
-                if(ddPunct[i] < minOnY)
-                {
-                    minOnY = ddPunct[i];
-                }
-            }
-
-            if(minOnY != decimal.MaxValue)
-            {
-                _chartDd.ChartAreas[0].AxisY2.Maximum = - Convert.ToDouble(minOnY) * 0.05;
-                _chartDd.ChartAreas[0].AxisY2.Minimum = Convert.ToDouble(minOnY) + Convert.ToDouble(minOnY) * 0.05;
-            }
-
-            // dd in %
-            // дд в %
-
-            List<decimal> ddPepcent = new decimal[positionsAll.Count].ToList();
-            lastMax = 0;
-            currentProfit = 0;
-
-            for (int i = 0; i < positionsAll.Count; i++)
-            {
-                currentProfit += positionsAll[i].ProfitPortfolioPersent * (positionsAll[i].MultToJournal / 100);
-
-                if (lastMax < currentProfit)
-                {
-                    lastMax = currentProfit;
+                    return;
                 }
 
-                if (currentProfit - lastMax < 0)
+                List<decimal> ddPunct = new decimal[positionsAll.Count].ToList();
+                decimal lastMax = 0;
+                decimal currentProfit = 0;
+
+                for (int i = 0; i < positionsAll.Count; i++)
                 {
-                    ddPepcent[i] = Math.Round(currentProfit - lastMax, 4);
+                    currentProfit += positionsAll[i].ProfitPortfolioPunkt * (positionsAll[i].MultToJournal / 100);
+
+                    if (lastMax < currentProfit)
+                    {
+                        lastMax = currentProfit;
+                    }
+
+                    if (currentProfit - lastMax < 0)
+                    {
+                        ddPunct[i] = currentProfit - lastMax;
+                    }
+                }
+
+                Series drowDownPunct = new Series("SeriesDdPunct");
+                drowDownPunct.ChartType = SeriesChartType.Line;
+                drowDownPunct.Color = Color.DeepSkyBlue;
+                drowDownPunct.LabelForeColor = Color.White;
+                drowDownPunct.YAxisType = AxisType.Secondary;
+                drowDownPunct.ChartArea = "ChartAreaDdPunct";
+                drowDownPunct.BorderWidth = 2;
+                drowDownPunct.ShadowOffset = 2;
+
+                Series nullLine = new Series("SeriesNullLine");
+                nullLine.ChartType = SeriesChartType.Line;
+                nullLine.YAxisType = AxisType.Secondary;
+                nullLine.LabelForeColor = Color.White;
+                nullLine.ChartArea = "ChartAreaDdPunct";
+                nullLine.ShadowOffset = 0;
+
+                for (int i = 0; i < ddPunct.Count; i++)
+                {
+                    decimal val = Math.Round(ddPunct[i], 6);
+                    drowDownPunct.Points.Add(Convert.ToDouble(val));
+
+                    drowDownPunct.Points[drowDownPunct.Points.Count - 1].AxisLabel =
+                   positionsAll[i].TimeCreate.ToString(_currentCulture);
+
+                    drowDownPunct.Points[drowDownPunct.Points.Count - 1].LegendText = val.ToString();
+
+                    nullLine.Points.Add(0);
+                    nullLine.Points[nullLine.Points.Count - 1].AxisLabel =
+                        positionsAll[i].TimeCreate.ToString(_currentCulture);
+                }
+
+                _chartDd.Series.Add(drowDownPunct);
+                _chartDd.Series.Add(nullLine);
+
+                decimal minOnY = decimal.MaxValue;
+
+                for (int i = 0; i < ddPunct.Count; i++)
+                {
+                    if (ddPunct[i] < minOnY)
+                    {
+                        minOnY = ddPunct[i];
+                    }
+                }
+
+                if (minOnY != decimal.MaxValue &&
+                    minOnY != 0)
+                {
+                    _chartDd.ChartAreas[0].AxisY2.IntervalType = DateTimeIntervalType.Number;
+                    _chartDd.ChartAreas[0].AxisY2.IntervalOffsetType = DateTimeIntervalType.Number;
+                    _chartDd.ChartAreas[0].AxisY2.Maximum = -Convert.ToDouble(minOnY) * 0.05;
+                    _chartDd.ChartAreas[0].AxisY2.Minimum = Convert.ToDouble(minOnY) + Convert.ToDouble(minOnY) * 0.05;
+                }
+
+                // dd in %
+                // дд в %
+
+                List<decimal> ddPepcent = new decimal[positionsAll.Count].ToList();
+
+                decimal firsValue = positionsAll[0].PortfolioValueOnOpenPosition;
+
+                for (int i = 0; i < positionsAll.Count; i++)
+                {
+                    if (firsValue != 0)
+                    {
+                        break;
+                    }
+                    firsValue = positionsAll[i].PortfolioValueOnOpenPosition;
+                }
+
+                if (firsValue == 0)
+                {
+                    firsValue = 1;
+                }
+
+                decimal thisSumm = firsValue;
+                decimal thisPik = firsValue;
+
+                for (int i = 0; i < positionsAll.Count; i++)
+                {
+                    thisSumm += positionsAll[i].ProfitPortfolioPunkt * (positionsAll[i].MultToJournal / 100);
+
+                    if (thisSumm > thisPik)
+                    {
+                        thisPik = thisSumm;
+                    }
+
+                    decimal thisDown = 0;
+
+                    if (thisSumm < 0)
+                    {
+                        // уже ушли ниже нулевой отметки по счёту
+
+                        thisDown = -thisPik + thisSumm;
+                    }
+                    else if (thisSumm > 0)
+                    {
+                        // выше нулевой отметки по счёту
+                        thisDown = -(thisPik - thisSumm);
+                    }
+
+                    ddPepcent[i] = (thisDown / (thisPik / 100));
+                }
+
+                    Series drowDownPersent = new Series("SeriesDdPercent");
+                drowDownPersent.ChartType = SeriesChartType.Line;
+                drowDownPersent.Color = Color.DarkOrange;
+                drowDownPersent.LabelForeColor = Color.White;
+                drowDownPersent.YAxisType = AxisType.Secondary;
+                drowDownPersent.ChartArea = "ChartAreaDdPersent";
+                drowDownPersent.BorderWidth = 2;
+                drowDownPersent.ShadowOffset = 2;
+
+                for (int i = 0; i < ddPepcent.Count; i++)
+                {
+                    decimal val = Math.Round(ddPepcent[i], 6);
+                    drowDownPersent.Points.Add(Convert.ToDouble(val));
+                    drowDownPersent.Points[drowDownPersent.Points.Count - 1].AxisLabel =
+                   positionsAll[i].TimeCreate.ToString(_currentCulture);
+
+                    drowDownPersent.Points[drowDownPersent.Points.Count - 1].LegendText = val.ToString();
+                }
+
+                _chartDd.Series.Add(drowDownPersent);
+
+                decimal minOnY2 = decimal.MaxValue;
+
+                for (int i = 0; i < ddPepcent.Count; i++)
+                {
+                    if (ddPepcent[i] < minOnY2)
+                    {
+                        minOnY2 = ddPepcent[i];
+                    }
+                }
+
+                if (minOnY2 != decimal.MaxValue &&
+                    minOnY2 != 0)
+                {
+                    _chartDd.ChartAreas[1].AxisY2.IntervalType = DateTimeIntervalType.Number;
+                    _chartDd.ChartAreas[1].AxisY2.IntervalOffsetType = DateTimeIntervalType.Number;
+                    _chartDd.ChartAreas[1].AxisY2.Maximum = -Convert.ToDouble(minOnY2) * 0.05;
+                    _chartDd.ChartAreas[1].AxisY2.Minimum = Convert.ToDouble(minOnY2) + Convert.ToDouble(minOnY2) * 0.05;
                 }
             }
-
-            Series drowDownPersent = new Series("SeriesDdPercent");
-            drowDownPersent.ChartType = SeriesChartType.Line;
-            drowDownPersent.Color = Color.DarkOrange;
-            drowDownPersent.LabelForeColor = Color.White;
-            drowDownPersent.YAxisType = AxisType.Secondary;
-            drowDownPersent.ChartArea = "ChartAreaDdPersent";
-            drowDownPersent.BorderWidth = 2;
-            drowDownPersent.ShadowOffset = 2;
-
-            for (int i = 0; i < ddPepcent.Count; i++)
+            catch (Exception ex)
             {
-                decimal val = Math.Round(ddPepcent[i], 6);
-                drowDownPersent.Points.Add(Convert.ToDouble(val));
-                drowDownPersent.Points[drowDownPersent.Points.Count - 1].AxisLabel =
-               positionsAll[i].TimeCreate.ToString(_currentCulture);
-
-                drowDownPersent.Points[drowDownPersent.Points.Count - 1].LegendText = val.ToString();
-            }
-
-            _chartDd.Series.Add(drowDownPersent);
-
-            decimal minOnY2 = decimal.MaxValue;
-
-            for (int i = 0; i < ddPepcent.Count; i++)
-            {
-                if (ddPepcent[i] < minOnY2)
-                {
-                    minOnY2 = ddPepcent[i];
-                }
-            }
-
-            if (minOnY2 != decimal.MaxValue)
-            {
-                _chartDd.ChartAreas[1].AxisY2.Maximum = -Convert.ToDouble(minOnY2) * 0.05;
-                _chartDd.ChartAreas[1].AxisY2.Minimum = Convert.ToDouble(minOnY2) + Convert.ToDouble(minOnY2) * 0.05;
+                SendNewLogMessage(ex.ToString(), LogMessageType.Error);
             }
         }
 
-        // positions
         // позиции
 
         /// <summary>
@@ -1774,10 +1811,17 @@ namespace OsEngine.Journal
                 nRow.Cells[0].Value = position.Number;
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[1].Value = position.TimeCreate;
+                nRow.Cells[1].Value = position.TimeCreate.ToString(_currentCulture);
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
-                nRow.Cells[2].Value = position.TimeClose;
+                if (position.TimeClose != position.TimeOpen)
+                {
+                    nRow.Cells[2].Value = position.TimeClose.ToString(_currentCulture);
+                }
+                else
+                {
+                    nRow.Cells[2].Value = "";
+                }
 
                 nRow.Cells.Add(new DataGridViewTextBoxCell());
                 nRow.Cells[3].Value = position.NameBot;
@@ -1924,6 +1968,11 @@ namespace OsEngine.Journal
             int number;
             try
             {
+                if(_openPositionGrid.CurrentCell == null)
+                {
+                    return;
+                }
+
                 number = Convert.ToInt32(_openPositionGrid.Rows[_openPositionGrid.CurrentCell.RowIndex].Cells[0].Value);
             }
             catch (Exception)
@@ -2024,6 +2073,7 @@ namespace OsEngine.Journal
             newPos.NameBot = botName;
             _botsJournals[number]._Tabs[0].Journal.SetNewDeal(newPos);
 
+
             RePaint();
         }
 
@@ -2062,7 +2112,7 @@ namespace OsEngine.Journal
                 }
             }
         }
-        // closed positions
+
         // позиции закрытые
 
         /// <summary>
@@ -2218,6 +2268,10 @@ namespace OsEngine.Journal
             int number;
             try
             {
+                if(_closePositionGrid.CurrentCell == null)
+                {
+                    return;
+                }
                 number = Convert.ToInt32(_closePositionGrid.Rows[_closePositionGrid.CurrentCell.RowIndex].Cells[0].Value);
             }
             catch (Exception)
@@ -2237,6 +2291,10 @@ namespace OsEngine.Journal
             int number;
             try
             {
+                if(_closePositionGrid.CurrentCell == null)
+                {
+                    return;
+                }
                 number = Convert.ToInt32(_closePositionGrid.Rows[_closePositionGrid.CurrentCell.RowIndex].Cells[0].Value);
             }
             catch (Exception)
@@ -2370,7 +2428,6 @@ namespace OsEngine.Journal
             }
         }
 
-        // messages to the log
         // сообщения в лог
 
         /// <summary>
@@ -2761,16 +2818,23 @@ namespace OsEngine.Journal
 
             for (int i = 0; i < positionsAll.Count; i++)
             {
-                DateTime timeCreate = positionsAll[i].TimeCreate;
+                Position pose = positionsAll[i];
+
+                if (pose.State == PositionStateType.OpeningFail)
+                {
+                    continue;
+                }
+
+                DateTime timeCreate = pose.TimeCreate;
 
                 if (newPositionsAll.Count == 0 ||
                     newPositionsAll[newPositionsAll.Count - 1].TimeCreate <= timeCreate)
                 {
-                    newPositionsAll.Add(positionsAll[i]);
+                    newPositionsAll.Add(pose);
                 }
                 else if (newPositionsAll[0].TimeCreate >= timeCreate)
                 {
-                    newPositionsAll.Insert(0, positionsAll[i]);
+                    newPositionsAll.Insert(0, pose);
                 }
                 else
                 {
@@ -2779,7 +2843,7 @@ namespace OsEngine.Journal
                         if (newPositionsAll[i2].TimeCreate <= timeCreate &&
                             newPositionsAll[i2 + 1].TimeCreate >= timeCreate)
                         {
-                            newPositionsAll.Insert(i2 + 1, positionsAll[i]);
+                            newPositionsAll.Insert(i2 + 1, pose);
                             break;
                         }
                     }
@@ -2797,10 +2861,13 @@ namespace OsEngine.Journal
                 return;
             }
 
-            startTime = _allPositions[0].TimeOpen;
-            endTime = _allPositions[_allPositions.Count - 1].TimeOpen;
-            minTime = startTime;
-            maxTime = endTime;
+            if (IsSlide == false)
+            {
+                startTime = _allPositions[0].TimeOpen;
+                endTime = _allPositions[_allPositions.Count - 1].TimeOpen;
+                minTime = startTime;
+                maxTime = endTime;
+            }
         }
 
         private void LoadGroups()
@@ -2994,8 +3061,7 @@ namespace OsEngine.Journal
             }
 
             SaveGroups();
-            _neadToRapaintBotsGrid = true;
-            CreatePositionsLists();
+            RePaint();
         }
 
         private void ChangeGroup(DataGridViewCellEventArgs e)
@@ -3086,6 +3152,8 @@ namespace OsEngine.Journal
         DateTime endTime;
         DateTime maxTime;
 
+        private bool IsSlide;      // двигались ли слайдеры установки периода
+
         private void CreateSlidersShowPositions()
         {
             SliderFrom.ValueChanged -= SliderFrom_ValueChanged;
@@ -3099,8 +3167,8 @@ namespace OsEngine.Journal
                 return;
             }
 
-            TextBoxFrom.Text = startTime.ToString(new CultureInfo("RU-ru"));
-            TextBoxTo.Text = endTime.ToString(new CultureInfo("RU-ru"));
+            TextBoxFrom.Text = startTime.ToString(_currentCulture);
+            TextBoxTo.Text = endTime.ToString(_currentCulture);
 
             SliderFrom.Minimum = (startTime - DateTime.MinValue).TotalMinutes;
             SliderFrom.Maximum = (endTime - DateTime.MinValue).TotalMinutes;
@@ -3128,13 +3196,14 @@ namespace OsEngine.Journal
 
             DateTime to = DateTime.MinValue.AddMinutes(SliderFrom.Minimum + SliderFrom.Maximum - SliderTo.Value);
             endTime = to;
-            TextBoxTo.Text = to.ToString(new CultureInfo("RU-ru"));
+            TextBoxTo.Text = to.ToString(_currentCulture);
 
             if (SliderFrom.Minimum + SliderFrom.Maximum - SliderTo.Value < SliderFrom.Value)
             {
                 SliderFrom.Value = SliderFrom.Minimum + SliderFrom.Maximum - SliderTo.Value;
             }
             TextBoxTo.TextChanged += TextBoxTo_TextChanged;
+            IsSlide = true;  			
         }
 
         void SliderFrom_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -3143,7 +3212,7 @@ namespace OsEngine.Journal
 
             DateTime from = DateTime.MinValue.AddMinutes(SliderFrom.Value);
             startTime = from;
-            TextBoxFrom.Text = from.ToString(new CultureInfo("RU-ru"));
+            TextBoxFrom.Text = from.ToString(_currentCulture);
 
             if (SliderFrom.Minimum + SliderFrom.Maximum - SliderTo.Value < SliderFrom.Value)
             {
@@ -3151,6 +3220,7 @@ namespace OsEngine.Journal
             }
 
             TextBoxFrom.TextChanged += TextBoxFrom_TextChanged;
+            IsSlide = true;  			
         }
 
         void TextBoxTo_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
@@ -3158,7 +3228,7 @@ namespace OsEngine.Journal
             DateTime to;
             try
             {
-                to = Convert.ToDateTime(TextBoxTo.Text);
+                to = Convert.ToDateTime(TextBoxTo.Text, _currentCulture);
 
                 if (to < minTime ||
                     to > maxTime)
@@ -3168,7 +3238,7 @@ namespace OsEngine.Journal
             }
             catch (Exception)
             {
-                TextBoxTo.Text = endTime.ToString(new CultureInfo("RU-ru"));
+                TextBoxTo.Text = endTime.ToString(_currentCulture);
                 return;
             }
 
@@ -3183,7 +3253,7 @@ namespace OsEngine.Journal
             DateTime from;
             try
             {
-                from = Convert.ToDateTime(TextBoxFrom.Text);
+                from = Convert.ToDateTime(TextBoxFrom.Text, _currentCulture);
 
                 if (from < minTime ||
                     from > maxTime)
@@ -3193,7 +3263,7 @@ namespace OsEngine.Journal
             }
             catch (Exception)
             {
-                TextBoxFrom.Text = startTime.ToString(new CultureInfo("RU-ru"));
+                TextBoxFrom.Text = startTime.ToString(_currentCulture);
                 return;
             }
 

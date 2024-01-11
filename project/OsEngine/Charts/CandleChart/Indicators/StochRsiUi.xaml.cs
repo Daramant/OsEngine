@@ -6,6 +6,7 @@
 using System;
 using System.Windows;
 using System.Windows.Forms;
+using OsEngine.Entity;
 using OsEngine.Language;
 using MessageBox = System.Windows.MessageBox;
 
@@ -36,6 +37,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public StochRsiUi(StochRsi rsi)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _rsi = rsi;
 
             TextBoxLenght.Text = _rsi.RsiLenght.ToString();
@@ -96,7 +99,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColor_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColor.Child.BackColor;
             dialog.ShowDialog();
 
@@ -109,7 +112,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColorD_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorD.Child.BackColor;
             dialog.ShowDialog();
 

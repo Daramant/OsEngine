@@ -2,6 +2,7 @@
  *Ваши права на использования кода регулируются данной лицензией http://o-s-a.net/doc/license_simple_engine.pdf
 */
 
+using OsEngine.Entity;
 using System;
 using System.Windows;
 using System.Windows.Forms;
@@ -32,6 +33,8 @@ namespace OsEngine.Charts.CandleChart.Indicators
         public DonchianChannelUi(DonchianChannel donchian)
         {
             InitializeComponent();
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _donchian = donchian;
 
             TextBoxLenght.Text = _donchian.Lenght.ToString();
@@ -89,7 +92,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColorUp_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorUp.Child.BackColor;
             dialog.ShowDialog();
             HostColorUp.Child.BackColor = dialog.Color;
@@ -100,7 +103,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColorDown_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorDown.Child.BackColor;
             dialog.ShowDialog();
             HostColorDown.Child.BackColor = dialog.Color;
@@ -111,7 +114,7 @@ namespace OsEngine.Charts.CandleChart.Indicators
         /// </summary>
         private void ButtonColorAvg_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog dialog = new ColorDialog();
+            ColorCustomDialog dialog = new ColorCustomDialog();
             dialog.Color = HostColorAvg.Child.BackColor;
             dialog.ShowDialog();
             HostColorAvg.Child.BackColor = dialog.Color;

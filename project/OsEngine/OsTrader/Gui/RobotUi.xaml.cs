@@ -11,7 +11,6 @@ using OsEngine.Charts.CandleChart;
 using OsEngine.Entity;
 using OsEngine.Language;
 using OsEngine.Market;
-using Chart = System.Windows.Forms.DataVisualization.Charting.Chart;
 using OsEngine.Layout;
 
 namespace OsEngine.OsTrader.Gui
@@ -26,9 +25,14 @@ namespace OsEngine.OsTrader.Gui
         public RobotUi()
         {
             InitializeComponent();
-            ServerMaster.SetHostTable(HostPositionOnBoard, HostOrdersOnBoard);
-            _strategyKeeper = new OsTraderMaster(GridChart, ChartHostPanel, HostGlass, HostOpenPosition, HostClosePosition, HostAllPosition,
+            OsEngine.Layout.StickyBorders.Listen(this);
+            ServerMaster.SetHostTable(HostPositionOnBoard, HostOrdersOnBoard,null);
+
+            _strategyKeeper = new OsTraderMaster(GridChart, ChartHostPanel, HostGlass, HostOpenPosition, HostClosePosition,
                                          HostBotLog, HostBotLogPrime, RectChart, HostAllert, TabControlBotsName,TabControlBotTab,TextBoxPrice,GridChartControlPanel, StartProgram.IsOsTrader);
+
+            _strategyKeeper.CreateGlobalPositionController(HostAllPosition);
+
             Closing += RobotUi_Closing;
            
 

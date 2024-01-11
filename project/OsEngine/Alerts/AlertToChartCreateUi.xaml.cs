@@ -31,7 +31,8 @@ namespace OsEngine.Alerts
         public AlertToChartCreateUi(AlertToChart alert, AlertMaster keeper) 
         {
             InitializeComponent();
-
+            OsEngine.Layout.StickyBorders.Listen(this);
+            OsEngine.Layout.StartupLocation.Start_MouseInCentre(this);
             _waitOne = false;
             _waitTwo = false;
             NeadToSave = false;
@@ -40,6 +41,9 @@ namespace OsEngine.Alerts
             _candleTwoTime = DateTime.MinValue;
             _candleTwoValue = 0;
             _keeper = keeper;
+
+            Slider.ValueChanged += Slider_ValueChanged;
+            Slider.MouseLeave += Slider_MouseLeave;
 
             ComboBoxType.Items.Add(ChartAlertType.Line);
             ComboBoxType.Items.Add(ChartAlertType.FibonacciChannel);
@@ -58,13 +62,13 @@ namespace OsEngine.Alerts
             ComboBoxFatLine.Text = "2";
             TextBoxLabelAlert.Text = "";
 
-            System.Drawing.Color red = System.Drawing.Color.DarkRed;
+            System.Drawing.Color color = System.Drawing.Color.DodgerBlue;
 
             ButtonColorLabel.Background =
-                new SolidColorBrush(Color.FromArgb(red.A,red.R,red.G,red.B));
+                new SolidColorBrush(Color.FromArgb(color.A, color.R,color.G, color.B));
 
             ButtonColorLine.Background =
-                new SolidColorBrush(Color.FromArgb(red.A, red.R, red.G, red.B));
+                new SolidColorBrush(Color.FromArgb(color.A, color.R,color.G, color.B));
 
             CheckBoxWindow.IsChecked = false;
             TextBoxAlertMessage.Text = OsLocalization.Alerts.Message2;
@@ -92,12 +96,18 @@ namespace OsEngine.Alerts
             ComboBoxMusicType.Items.Add(AlertMusic.Wolf);
             ComboBoxMusicType.SelectedItem = AlertMusic.Bird;
 
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.Persent);
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.PriceStep);
+            ComboBoxSlippageType.Items.Add(AlertSlippageType.Absolute);
+            ComboBoxSlippageType.SelectedItem = AlertSlippageType.Persent;
+
             if (alert != null)
             {
                 MyAlert = alert;
                 LoadFromAlert();
                 ComboBoxType.IsEnabled = false;
                 NeadToSave = true;
+                ComboBoxSlippageType.SelectedItem = alert.SlippageType;
             }
             
             CheckBoxOnOff.Click += CheckBoxOnOff_Click;
@@ -115,7 +125,6 @@ namespace OsEngine.Alerts
             ChangeText();
             OsLocalization.LocalizationTypeChangeEvent += ChangeText;
 
-
             LabelOsa.MouseDown += LabelOsa_MouseDown;
 
             this.Activate();
@@ -132,9 +141,10 @@ namespace OsEngine.Alerts
             LabelOrderType.Content = OsLocalization.Alerts.Label5;
             LabelVolume.Content = OsLocalization.Alerts.Label6;
             LabelSlippage.Content = OsLocalization.Alerts.Label7;
+            LabelSlippageType.Content = OsLocalization.Alerts.Label19;
+
             LabelNumClosedPos.Content = OsLocalization.Alerts.Label8;
             LabelFireworks.Content = OsLocalization.Alerts.Label9;
-
 
             CheckBoxMusicAlert.Content = OsLocalization.Alerts.Label10;
             LabelLineWidth.Content = OsLocalization.Alerts.Label11;
@@ -145,7 +155,6 @@ namespace OsEngine.Alerts
             ButtonColorLine.Content = OsLocalization.Alerts.Label15;
             CheckBoxWindow.Content = OsLocalization.Alerts.Label16;
             ButtonSave.Content = OsLocalization.Alerts.Label17;
-
         }
 
         void LabelOsa_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -263,6 +272,7 @@ namespace OsEngine.Alerts
             TextBoxVolumeReaction.Text = MyAlert.VolumeReaction.ToString();
 
             TextBoxSlippage.Text = MyAlert.Slippage.ToString(new CultureInfo("ru-RU"));
+            ComboBoxSlippageType.SelectedItem = MyAlert.SlippageType;
             TextBoxClosePosition.Text = MyAlert.NumberClosePosition.ToString();
             TextBoxVolumeReaction.Text = MyAlert.VolumeReaction.ToString();
             ComboBoxOrderType.SelectedItem = MyAlert.OrderPriceType;
@@ -315,8 +325,8 @@ namespace OsEngine.Alerts
         {
             SaveAlert();
         }
-        // slider work
-        //работа со слайдером
+
+        #region slider work
 
         /// <summary>
         /// slider's position has changed.
@@ -333,9 +343,18 @@ namespace OsEngine.Alerts
             }
 
             SetReadyLineAlert(_arrayCandles);
-
         }
 
+        private void Slider_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            Slider.ValueChanged -= Slider_ValueChanged;
+
+            Slider.Value = 100;
+
+            Slider.ValueChanged += Slider_ValueChanged;
+        }
+
+        #endregion
         /// <summary>
         /// latest incoming data
         ///  последние входящие данные 
@@ -561,6 +580,8 @@ namespace OsEngine.Alerts
             MyAlert.VolumeReaction = TextBoxVolumeReaction.Text.ToDecimal();
 
             MyAlert.Slippage = TextBoxSlippage.Text.ToDecimal();
+            Enum.TryParse(ComboBoxSlippageType.SelectedItem.ToString(), true, out MyAlert.SlippageType);
+
             MyAlert.NumberClosePosition = Convert.ToInt32(TextBoxClosePosition.Text);
             Enum.TryParse(ComboBoxOrderType.Text, true, out MyAlert.OrderPriceType);
 
@@ -591,6 +612,8 @@ namespace OsEngine.Alerts
             // create new alert
             // создаём новый алерт
             AlertToChart alert = new AlertToChart(_keeper.HostAllert);
+            alert.ColorLine = System.Drawing.Color.DodgerBlue;
+            alert.ColorLabel = System.Drawing.Color.DodgerBlue;
             alert.Name = null;
             alert.Lines = GetAlertLines(candles);
 
@@ -932,12 +955,15 @@ namespace OsEngine.Alerts
             int secondHourCandle = -1;
 
             int nowHour = candles[candles.Count - 1].TimeStart.Hour;
+            int nowDay = candles[candles.Count - 1].TimeStart.Day;
 
             for (int i = candles.Count - 1; i > -1; i--)
             {
-                if (nowHour != candles[i].TimeStart.Hour)
+                if (nowHour != candles[i].TimeStart.Hour 
+                    || nowDay != candles[i].TimeStart.Day)
                 {
                     nowHour = candles[i].TimeStart.Hour;
+                    nowDay = candles[i].TimeStart.Day;
 
                     if (firstHourCandle == -1)
                     {
@@ -994,7 +1020,7 @@ namespace OsEngine.Alerts
         /// </summary>
         private void ButtonColorLabel_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog ui = new ColorDialog();
+            ColorCustomDialog ui = new ColorCustomDialog();
 
             System.Windows.Media.Color labelColor = ((SolidColorBrush)ButtonColorLabel.Background).Color;
             ui.Color = System.Drawing.Color.FromArgb(labelColor.A, labelColor.R, labelColor.G, labelColor.B);
@@ -1014,7 +1040,7 @@ namespace OsEngine.Alerts
         /// </summary>
         private void ButtonColorLine_Click(object sender, RoutedEventArgs e)
         {
-            ColorDialog ui = new ColorDialog();
+            ColorCustomDialog ui = new ColorCustomDialog();
 
             System.Windows.Media.Color lineColor = ((SolidColorBrush)ButtonColorLine.Background).Color;
             ui.Color = System.Drawing.Color.FromArgb(lineColor.A, lineColor.R, lineColor.G, lineColor.B);

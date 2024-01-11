@@ -141,6 +141,8 @@ namespace OsEngine.Charts.CandleChart
         /// <param name="history">candles/свечи</param>
         void ProcessCandles(List<Candle> history);
 
+        int OpenChartScale { get; set; }
+
         // Deals / сделки
 
         /// <summary>
@@ -149,6 +151,16 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         /// <param name="deals">deals/сделки</param>
         void ProcessPositions(List<Position> deals);
+
+        // Stop Limits / стоп Лимиты
+
+        /// <summary>
+        /// add stop limits to the drawing
+        /// добавить Стоп-лимиты в прорисовку
+        /// </summary>
+        /// <param name="deals">deals/сделки</param>
+        void ProcessStopLimits(List<PositionOpenerToStopLimit> stopLimits);
+
 
         // CUSTOM ELEMENTS ПОЛЬЗОВАТЕЛЬСКИЕ ЭЛЕМЕНТЫ
 
@@ -181,9 +193,11 @@ namespace OsEngine.Charts.CandleChart
 
         // Alerts АЛЕРТЫ
 
-        void ClearAlerts(List<IIAlert> alertArray);
+        void RemoveAlert(AlertToChart alertToChart);
 
-        void PaintAlert(AlertToChart alert);
+        bool HaveAlertOnChart(AlertToChart alertToChart);
+
+        void ProcessAlert(AlertToChart alert, bool neadToWait);
 
         /// <summary>
         /// draw a line on a series
@@ -235,6 +249,11 @@ namespace OsEngine.Charts.CandleChart
         /// </summary>
         void GoChartToIndex(int index);
 
+        void SetAxisXSize(int size);
+
+        void SetAxisXPositionFromRight(int xPosition);
+
+
         // management of collapsing areas управление схлопывание областей
 
         /// <summary>
@@ -254,6 +273,12 @@ namespace OsEngine.Charts.CandleChart
         /// изменилось представление по оси Х
         /// </summary>
         event Action<int> SizeAxisXChangeEvent;
+
+        /// <summary>
+        /// the distance from the right edge to the location of the view on the X axis has changed
+        /// изменилось расстояние от правого края до расположения представления на оси X
+        /// </summary>
+        event Action<int> LastXIndexChangeEvent;
 
         event Action<ChartClickType> ChartClickEvent;
 

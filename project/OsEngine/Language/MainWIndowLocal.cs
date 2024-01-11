@@ -14,7 +14,7 @@ namespace OsEngine.Language
 
         public string BlockDataLabel => OsLocalization.ConvertToLocString(
             "Eng:Work with data_"+
-            "Ru:Работа с данными_");
+            "Ru:Данные_");
 
         public string BlockTestingLabel => OsLocalization.ConvertToLocString(
             "Eng:Testing_"+
@@ -93,5 +93,11 @@ namespace OsEngine.Language
             + "5) Возможно придётся удалить процесс Os.Engine из диспетчера задач руками.  \r "
             + "6) Ошибка:  _"
             );
+
+
+        public string Message6 => OsLocalization.ConvertToLocString(
+            "Eng:It looks like you didn't run the program from its folder. Not by creating a shortcut, but by moving the program. You can't do that!_" +
+            "Ru:Похоже Вы запустили программу не из папки с ней. Не создав ярлык, а обычным перемещением. Так нельзя!_");
+
     }
 }
