@@ -27,7 +27,6 @@ namespace OsEngine.Market.Servers.Alor
             ServerRealization = realization;
 
             CreateParameterString(OsLocalization.Market.ServerParamToken, "");
-
             CreateParameterString(OsLocalization.Market.Label112, "");
             CreateParameterString(OsLocalization.Market.Label113, "");
             CreateParameterString(OsLocalization.Market.Label114, "");
@@ -37,10 +36,6 @@ namespace OsEngine.Market.Servers.Alor
             CreateParameterBoolean(OsLocalization.Market.UseCurrency, true);
             CreateParameterBoolean(OsLocalization.Market.UseOptions, false);
             CreateParameterBoolean(OsLocalization.Market.UseOther, false);
-
-            /*CreateParameterEnum(OsLocalization.Market.Exchange, 
-             AlorAvailableExchanges.MOEX.ToString(), 
-             new List<string> { AlorAvailableExchanges.MOEX.ToString(),AlorAvailableExchanges.SPBX.ToString()});*/
         }
     }
 
@@ -98,13 +93,6 @@ namespace OsEngine.Market.Servers.Alor
                     return;
                 }
 
-                if (CheckInternet() == false)
-                {
-                    SendLogMessage("Server connection error. There is no internet or the exchange server is not available.",
-                    LogMessageType.Error);
-                    return;
-                }
-
                 if (GetCurSessionToken() == false)
                 {
                     SendLogMessage("Authorization Error. Probably an invalid token is specified. You can see it on the Alor website.",
@@ -119,26 +107,6 @@ namespace OsEngine.Market.Servers.Alor
             {
                 SendLogMessage(ex.Message.ToString(), LogMessageType.Error);
             }
-        }
-
-        private bool CheckInternet()
-        {
-            // check server availability for HTTP communication with it / проверяем доступность сервера для HTTP общения с ним
-            Uri uri = new Uri("https://alorbroker.ru/");
-
-            try
-            {
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-                var httpWebRequest = (HttpWebRequest)WebRequest.Create(uri);
-                HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-            }
-            catch (Exception exception)
-            {
-                SendLogMessage("Server connection error. There is no internet or the exchange server is not available.", LogMessageType.Error);
-                return false;
-            }
-
-            return true;
         }
 
         private void ConnectionCheckThread()
@@ -858,7 +826,7 @@ namespace OsEngine.Market.Servers.Alor
 
         #region 6 Security subscrible
 
-        private RateGate rateGateSubscrible = new RateGate(1, TimeSpan.FromMilliseconds(350));
+        private RateGate rateGateSubscrible = new RateGate(1, TimeSpan.FromMilliseconds(50));
 
         List<Security> _subscribledSecurities = new List<Security>();
 
@@ -1756,6 +1724,23 @@ namespace OsEngine.Market.Servers.Alor
                 order.State = OrderStateType.Fail;
             }
 
+            lock (_sendOrdersArrayLocker)
+            {
+                for (int i = 0; i < _sendOrders.Count; i++)
+                {
+                    if (_sendOrders[i] == null)
+                    {
+                        continue;
+                    }
+
+                    if (_sendOrders[i].NumberUser == order.NumberUser)
+                    {
+                        order.TypeOrder = _sendOrders[i].TypeOrder;
+                        break;
+                    }
+                }
+            }
+
             if (MyOrderEvent != null)
             {
                 MyOrderEvent(order);
@@ -1811,12 +1796,29 @@ namespace OsEngine.Market.Servers.Alor
 
         private List<AlorSecuritiesAndPortfolious> _securitiesAndPortfolious = new List<AlorSecuritiesAndPortfolious>();
 
+        private List<Order> _sendOrders = new List<Order>();
+
+        private string _sendOrdersArrayLocker = "alorSendOrdersArrayLocker";
+
         public void SendOrder(Order order)
         {
             rateGateSendOrder.WaitToProceed();
 
             try
             {
+                if(order.TypeOrder == OrderPriceType.Market)
+                {
+                    lock (_sendOrdersArrayLocker)
+                    {
+                        _sendOrders.Add(order);
+
+                        while (_sendOrders.Count > 100)
+                        {
+                            _sendOrders.RemoveAt(0);
+                        }
+                    }
+                }
+
                 string endPoint = "";
 
                 if(order.TypeOrder == OrderPriceType.Limit)
@@ -2129,7 +2131,7 @@ namespace OsEngine.Market.Servers.Alor
 
         #endregion
 
-        #region 9 Helpers
+        #region 10 Helpers
 
         public long ConvertToUnixTimestamp(DateTime date)
         {
@@ -2193,7 +2195,7 @@ namespace OsEngine.Market.Servers.Alor
 
         #endregion
 
-        #region 10 Log
+        #region 11 Log
 
         private void SendLogMessage(string message, LogMessageType messageType)
         {
@@ -2218,7 +2220,6 @@ namespace OsEngine.Market.Servers.Alor
         public AlorSubType SubType;
 
         public string ServiceInfo;
-
     }
 
     public class AlorChangePriceOrder

@@ -201,6 +201,8 @@ namespace OsEngine.OsTrader.Panels.Tab
                 TextBoxSearchSecurity.MouseLeave += TextBoxSearchSecurity_MouseLeave;
                 TextBoxSearchSecurity.LostKeyboardFocus += TextBoxSearchSecurity_LostKeyboardFocus;
 
+                ComboBoxTypeServer_SelectionChanged(null, null);
+
                 Closed += BotTabScreenerUi_Closed;
             }
             catch (Exception error)
@@ -558,7 +560,18 @@ namespace OsEngine.OsTrader.Panels.Tab
         {
             try
             {
+                if(_selectedType == ServerType.None)
+                {
+                    return;
+                }
+
                 List<IServer> serversAll = ServerMaster.GetServers();
+
+                if(serversAll == null ||
+                    serversAll.Count == 0)
+                {
+                    return;
+                }
 
                 IServer server = serversAll.Find(server1 => server1.ServerType == _selectedType);
 
@@ -602,6 +615,7 @@ namespace OsEngine.OsTrader.Panels.Tab
         private void server_SecuritiesCharngeEvent(List<Security> securities)
         {
             LoadClassOnBox();
+            LoadSecurityOnBox();
         }
 
         /// <summary>
@@ -811,6 +825,9 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 UpdateGrid(securitiesToLoad);
 
+                UpdateSearchResults();
+                UpdateSearchPanel();
+                CheckBoxSelectAllCheckBox.IsChecked = false;
             }
             catch (Exception error)
             {
